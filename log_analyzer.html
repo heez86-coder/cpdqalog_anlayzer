@@ -24,8 +24,12 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f5f5;color:#1a1a1a;fo
 .tab{padding:10px 14px;font-size:13px;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;border-top:none;border-left:none;border-right:none}
 .tab:hover{color:#333}
 .tab.active{color:#1a1a1a;font-weight:600;border-bottom-color:#2980b9}
-.paste-box{border:2px dashed #ccc;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;background:#fafafa}
-.paste-box textarea{width:100%;height:160px;padding:10px;font-size:12px;font-family:'Consolas','Courier New',monospace;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;resize:vertical;line-height:1.5}
+.upload-box{border:2px dashed #ccc;border-radius:10px;padding:2rem 1.25rem;margin-top:1rem;background:#fafafa;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.upload-box:hover,.upload-box.drag{border-color:#2980b9;background:#f0f6fd}
+.upload-box input[type=file]{display:none}
+.upload-box .up-icon{font-size:32px;margin-bottom:8px;color:#aaa}
+.upload-box .up-label{font-size:13px;color:#666;margin-bottom:4px}
+.upload-box .up-hint{font-size:11px;color:#aaa}
 .tw{overflow-x:auto;border:1px solid #e0e0e0;border-radius:10px}
 table{border-collapse:collapse;font-size:12px;width:100%}
 thead th{background:#f5f5f5;padding:9px 11px;text-align:left;font-weight:600;color:#666;font-size:11px;border-bottom:1px solid #e0e0e0;white-space:nowrap}
@@ -73,20 +77,22 @@ input[type=text]:focus,select:focus{border-color:#2980b9}
 <div class="header-card">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
-      <div style="font-size:18px;font-weight:700;color:#111" id="logTitle">네트워크 품질 로그 분석기</div>
-      <div style="font-size:12px;color:#888;margin-top:3px" id="logSub">로그 파일을 붙여넣어 분석을 시작하세요</div>
+      <div style="font-size:18px;font-weight:700;color:#111" id="logTitle">CpGdDqaLog 분석기</div>
+      <div style="font-size:12px;color:#888;margin-top:3px" id="logSub">.LOG 파일을 업로드하여 분석을 시작하세요</div>
+      <div style="font-size:12px;font-weight:600;color:#2980b9;margin-top:2px" id="chipsetLine" style="display:none"></div>
     </div>
-    <button class="btn btn-p" onclick="togglePaste()">로그 붙여넣기</button>
+    <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG 파일 열기</button>
     <button class="btn" onclick="loadSample()">샘플 데이터</button>
     <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
   </div>
-  <div class="paste-box" id="pasteBox" style="display:none;margin-top:1rem;margin-bottom:0">
-    <div style="font-size:12px;color:#888;margin-bottom:8px">메모장(notepad)에서 로그 내용을 복사(Ctrl+A → Ctrl+C)한 후 아래에 붙여넣으세요 (Ctrl+V)</div>
-    <textarea id="pasteInput" placeholder="2026-04-05 11:03:57 CEND&#9;{&quot;JVER&quot;:&quot;SYH1&quot;, &quot;Ctype&quot;:&quot;4&quot;, ...}"></textarea>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="btn btn-p" onclick="doParse()">분석 시작</button>
-      <button class="btn" onclick="togglePaste()">닫기</button>
-    </div>
+  <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="event.preventDefault();this.classList.remove('drag');handleFile(event.dataTransfer.files[0])">
+    <input type="file" id="fileInput" accept=".log,.LOG,.txt" onchange="handleFile(this.files[0])">
+    <div class="up-icon">📂</div>
+    <div class="up-label">.LOG 파일을 클릭하거나 여기로 드래그하세요</div>
+    <div class="up-hint">텍스트 형식의 .LOG 파일 (JSON 스타일 로그)</div>
   </div>
 </div>
 
@@ -190,14 +196,23 @@ const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101"
 2026-04-08 14:00:00 DAST\t{"JVER":"SYH1","Ctype":"3","PLMN":"45005#"}
 2026-04-08 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"9","LDCH":"410","PLMN":"45005#"}`;
 
-function togglePaste(){const e=document.getElementById('pasteBox');e.style.display=e.style.display==='none'?'block':'none';}
-function loadSample(){document.getElementById('pasteInput').value=SAMPLE;document.getElementById('pasteBox').style.display='block';doParse();}
+function handleFile(file){
+  if(!file)return;
+  if(!/\.(log|txt)$/i.test(file.name)){alert('.LOG 또는 .TXT 파일만 업로드할 수 있습니다.');return;}
+  const reader=new FileReader();
+  reader.onload=e=>doParse(e.target.result,file.name);
+  reader.readAsText(file,'utf-8');
+}
+function loadSample(){doParse(SAMPLE,'sample.LOG');}
 function resetAll(){
   allRows=[];charts.forEach(c=>c.destroy());charts=[];
   document.getElementById('dashboard').style.display='none';
+  document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
-  document.getElementById('logTitle').textContent='네트워크 품질 로그 분석기';
-  document.getElementById('logSub').textContent='로그 파일을 붙여넣어 분석을 시작하세요';
+  document.getElementById('fileInput').value='';
+  document.getElementById('logTitle').textContent='CpGdDqaLog 분석기';
+  document.getElementById('logSub').textContent='.LOG 파일을 업로드하여 분석을 시작하세요';
+  document.getElementById('chipsetLine').textContent='';
 }
 function parseLine(line){
   line=line.replace(/\r/g,'');
@@ -207,17 +222,17 @@ function parseLine(line){
   let obj={};try{obj=JSON.parse(jp);}catch{return null;}
   return{Date:parts[0],Time:parts[1],Feature:parts.slice(2).join(' ').toUpperCase(),...obj};
 }
-function doParse(){
-  const text=document.getElementById('pasteInput').value.trim();if(!text)return;
+function doParse(text,filename){
+  if(!text||!text.trim()){alert('파일 내용이 비어있습니다.');return;}
   allRows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
   if(!allRows.length){alert('파싱 실패. 로그 형식을 확인해주세요.\n\n형식: 날짜 시간 Feature[탭]{JSON}');return;}
   const ks=new Set();allRows.forEach(r=>Object.keys(r).forEach(k=>ks.add(k)));
   allCols=['Date','Time','Feature',...[...ks].filter(k=>!['Date','Time','Feature'].includes(k))];
   buildStationMap();
-  document.getElementById('pasteBox').style.display='none';
+  document.getElementById('uploadBox').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('resetBtn').style.display='';
-  renderHeader();renderOverview();renderMuteTab();renderDaily();initRaw();
+  renderHeader(filename);renderOverview();renderMuteTab();renderDaily();initRaw();
   showTab('overview');
 }
 function getDates(){return[...new Set(allRows.map(r=>r.Date))].sort();}
@@ -283,12 +298,23 @@ function buildStationMap(){
   });
 }
 
-function renderHeader(){
+function getChipset(){
+  const jver=(allRows.find(r=>r.JVER)||{}).JVER||'';
+  if(jver.startsWith('S'))return'LSI';
+  if(jver.startsWith('Q'))return'QC';
+  if(jver.startsWith('M'))return'MTK';
+  return jver?'Unknown':'';
+}
+function renderHeader(filename){
   const dates=getDates();
   const antCnt=Object.values(stationMap).filter(s=>s.hasAntDiff).length;
   const micCnt=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>isOne(r[t.key]))).length;
-  document.getElementById('logTitle').textContent=`로그 : ${dates[0]} ~ ${dates[dates.length-1]} (${dates.length}일치 데이터 분석)`;
+  const chipset=getChipset();
+  document.getElementById('logTitle').textContent=`CpGdDqaLog : ${dates[0]} ~ ${dates[dates.length-1]} (${dates.length}일치 데이터 분석)`;
   document.getElementById('logSub').textContent=`총 ${allRows.length.toLocaleString()}건 이벤트 · Feature ${[...new Set(allRows.map(r=>r.Feature))].length}종 · 기지국 ${Object.keys(stationMap).length}개 감지${antCnt>0?' · ⚠ Ant Diff 의심 '+antCnt+'개':''}${micCnt>0?' · ⚠ 마이크 이상 '+micCnt+'건':''}`;
+  const cl=document.getElementById('chipsetLine');
+  cl.textContent=chipset?`칩셋 : ${chipset}`:'';
+  cl.style.display=chipset?'block':'none';
 }
 function calcKPI(rows){
   const cend=cnt('CEND',rows),drop=cnt('DROP',rows),mute=cnt('MUTE',rows),total=cend+drop;
@@ -432,7 +458,7 @@ function filterRaw(){
 }
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
 function renderRaw(){
-  const cols=allCols.slice(0,10);
+  const cols=allCols;
   const start=(rawPage-1)*RP,page=rawFiltered.slice(start,start+RP);
   document.getElementById('rawHead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
   document.getElementById('rawBody').innerHTML=page.length?page.map(r=>'<tr>'+cols.map(c=>{
