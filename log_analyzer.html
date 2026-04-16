@@ -70,6 +70,21 @@ tbody td{padding:8px 11px;color:#222;font-size:12px;white-space:nowrap}
 input[type=text],select{padding:7px 10px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;outline:none}
 input[type=text]:focus,select:focus{border-color:#2980b9}
 .no-data{text-align:center;padding:2rem;color:#aaa;font-size:13px}
+.th-sort{cursor:pointer;user-select:none}
+.th-sort:hover{background:#e8e8e8;color:#333}
+.th-sort.asc::after{content:' ↑';color:#2980b9}
+.th-sort.desc::after{content:' ↓';color:#2980b9}
+.rank-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;background:#f0f0f0;color:#888}
+.rank-badge.r1{background:#ffd700;color:#7a5c00}
+.rank-badge.r2{background:#c0c0c0;color:#444}
+.rank-badge.r3{background:#cd7f32;color:#fff}
+.detail-row td{padding:0!important}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px 16px;padding:10px 16px;background:#f9fbff;border-top:1px solid #e8e8e8}
+.detail-kv{font-size:11px;display:flex;gap:4px}
+.detail-k{color:#888;flex-shrink:0}
+.detail-v{color:#222;font-weight:500;word-break:break-all}
+.det-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px;color:#aaa;border-radius:4px}
+.det-btn:hover{background:#f0f0f0;color:#333}
 </style>
 </head>
 <body>
@@ -101,6 +116,7 @@ input[type=text]:focus,select:focus{border-color:#2980b9}
     <button class="tab active" onclick="showTab('overview')">전체 요약</button>
     <button class="tab" onclick="showTab('station')">문제 기지국</button>
     <button class="tab" onclick="showTab('mute')">MUTE 분석</button>
+    <button class="tab" onclick="showTab('drop')">DROP 분석</button>
     <button class="tab" onclick="showTab('daily')">일별 상세</button>
     <button class="tab" onclick="showTab('trend')">추이 그래프</button>
     <button class="tab" onclick="showTab('raw')">원본 데이터</button>
@@ -126,6 +142,7 @@ input[type=text]:focus,select:focus{border-color:#2980b9}
       <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
     </div>
     <div id="tab-mute" style="display:none"><div id="muteContent"></div></div>
+    <div id="tab-drop" style="display:none"><div id="dropContent"></div></div>
     <div id="tab-daily" style="display:none"><div id="dailyContent"></div></div>
     <div id="tab-trend" style="display:none"><div id="trendContent"></div></div>
     <div id="tab-raw" style="display:none">
@@ -274,7 +291,8 @@ function doParse(text,filename){
   document.getElementById('uploadBox').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('resetBtn').style.display='';
-  renderHeader(filename);renderOverview();renderMuteTab();renderDaily();initRaw();
+  stSortCol='default';stSortDir='desc';rawOpenIdx=new Set();
+  renderHeader(filename);renderOverview();renderMuteTab();renderDropTab();renderDaily();initRaw();
   showTab('overview');
 }
 function getDates(){return[...new Set(allRows.map(r=>r.Date))].sort();}
@@ -448,19 +466,105 @@ function renderMuteTab(){
   document.getElementById('muteContent').innerHTML=html;
 }
 
+let stSortCol='default',stSortDir='desc';
+function stSort(col){
+  if(stSortCol===col)stSortDir=stSortDir==='desc'?'asc':'desc';
+  else{stSortCol=col;stSortDir='desc';}
+  renderStationTable();
+}
+function renderDropTab(){
+  const dropRows=byFeat('DROP');
+  const total=dropRows.length;
+  if(!total){document.getElementById('dropContent').innerHTML='<div class="no-data">DROP 데이터가 없습니다.</div>';return;}
+  const rxp0=dropRows.map(r=>fNum(r.RxP0)).filter(v=>v!==null);
+  const rxp1=dropRows.map(r=>fNum(r.RxP1)).filter(v=>v!==null);
+  const snr0=dropRows.map(r=>fNum(r.SNR0)).filter(v=>v!==null);
+  const snr1=dropRows.map(r=>fNum(r.SNR1)).filter(v=>v!==null);
+  const antDiff=dropRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
+  const weakSig=dropRows.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100);
+  const lowSnr=dropRows.filter(r=>fNum(r.SNR0)!==null&&fNum(r.SNR0)<0);
+  const fmtV=v=>v!==null?v.toFixed(1):'-';
+  let html=`<div class="st">전체 DROP 요약</div><div class="mg">
+    ${mCard('총 DROP',total+'건','')}
+    ${mCard('avg RxP0',fmtV(avgArr(rxp0))+'dBm','수신전력 Ant0',avgArr(rxp0)<-100?'warn':'')}
+    ${mCard('avg RxP1',fmtV(avgArr(rxp1))+'dBm','수신전력 Ant1',avgArr(rxp1)<-100?'warn':'')}
+    ${mCard('avg SNR0',fmtV(avgArr(snr0))+'dB','SNR Ant0',avgArr(snr0)<0?'warn':'')}
+    ${mCard('avg SNR1',fmtV(avgArr(snr1))+'dB','SNR Ant1',avgArr(snr1)<0?'warn':'')}
+    ${mCard('Ant Diff ≥20dB',antDiff.length+'건',pct(antDiff.length,total)+'%',antDiff.length>0?'danger':'')}
+    ${mCard('약전계 DROP',weakSig.length+'건','RxP0 < -100dBm',weakSig.length>0?'warn':'')}
+    ${mCard('저SNR DROP',lowSnr.length+'건','SNR0 < 0dB',lowSnr.length>0?'warn':'')}
+  </div>`;
+  // 기지국별 DROP 현황
+  const stDrops=Object.values(stationMap).filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length);
+  if(stDrops.length){
+    html+=`<div class="divider"></div><div class="st">기지국별 DROP 현황</div><div class="cat-box">`;
+    const maxD=stDrops[0].drops.length;
+    stDrops.forEach((s,i)=>{
+      const adCnt=s.antDiffDrops.length;
+      const wkCnt=s.drops.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100).length;
+      html+=`<div class="bar-row">
+        <div class="bar-label" style="width:180px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid}<br><span style="font-size:11px;color:#aaa">CH ${s.dch}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/maxD*100).toFixed(1)}%;background:#e74c3c"></div></div>
+        <div class="bar-val">${s.drops.length}건${adCnt?` &nbsp;<span class="badge ttl" style="font-size:10px">Ant Diff ${adCnt}</span>`:''}${wkCnt?` &nbsp;<span class="badge tp" style="font-size:10px">약전계 ${wkCnt}</span>`:''}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+  // 일별 DROP
+  html+=`<div class="divider"></div><div class="st">일별 DROP 현황</div>`;
+  getDates().forEach(d=>{
+    const dRows=byFeat('DROP',byDate(d));if(!dRows.length)return;
+    const r0=dRows.map(r=>fNum(r.RxP0)).filter(v=>v!==null);
+    const s0=dRows.map(r=>fNum(r.SNR0)).filter(v=>v!==null);
+    const ad=dRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
+    html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · DROP ${dRows.length}건</div><div class="mg">
+      ${mCard('DROP',dRows.length+'건','')}
+      ${r0.length?mCard('avg RxP0',avgArr(r0).toFixed(1)+'dBm','',avgArr(r0)<-100?'warn':''):''}
+      ${s0.length?mCard('avg SNR0',avgArr(s0).toFixed(1)+'dB','',avgArr(s0)<0?'warn':''):''}
+      ${ad.length?mCard('Ant Diff',ad.length+'건','','danger'):''}
+    </div></div>`;
+  });
+  document.getElementById('dropContent').innerHTML=html;
+}
 function renderStationTable(){
   const q=(document.getElementById('stSearch').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
-  const all=Object.values(stationMap).filter(s=>{
+  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999};
+  const lvO={critical:0,warning:1,weak:2,normal:3};
+  let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
     if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
     if(q&&!`${s.tac}${s.pid}${s.dch}`.toLowerCase().includes(q))return false;
     return true;
-  }).sort((a,b)=>{const o={critical:0,warning:1,weak:2,normal:3};return(o[a.level]||9)-(o[b.level]||9)||(b.probCount-a.probCount);});
+  });
+  if(stSortCol==='default'||!colFn[stSortCol]){
+    all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.probCount-a.probCount));
+  } else {
+    const fn=colFn[stSortCol];
+    all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
+  }
   const lbl={critical:'위험',warning:'주의',weak:'약전계',normal:'정상'};
   const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
-  document.getElementById('stHead').innerHTML=`<tr><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th><th>CEND</th><th>DROP</th><th>MUTE</th><th>RLFI</th><th>이상률</th><th>avg RSRP</th><th>avg SINR</th><th>Ant Diff</th></tr>`;
-  document.getElementById('stBody').innerHTML=all.length?all.map(s=>`<tr><td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span>${s.hasAntDiff?` <span class="badge ttl">ANT</span>`:''}</td><td>${s.tac}</td><td>${s.pid}</td><td>${s.dch}</td><td>${s.cends.length}</td><td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td><td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td><td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td><td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?'700':'400'}">${s.problemRate.toFixed(1)}%</td><td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp+'dBm':'-'}</td><td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr+'dB':'-'}</td><td style="color:${s.hasAntDiff?'#0e6655':'inherit'};font-weight:${s.hasAntDiff?'700':'400'}">${s.antDiffDrops.length>0?s.antDiffDrops.length+'건 (최대 '+Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(0)+'dB)':'-'}</td></tr>`).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  const si=c=>stSortCol===c?` ${stSortDir}`:'';
+  const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
+  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLFI')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}<th>Ant Diff</th></tr>`;
+  document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
+    const rk=i+1;
+    const rkCls=rk<=3?`r${rk}`:'';
+    return`<tr>
+      <td><span class="rank-badge ${rkCls}">${rk}</span></td>
+      <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span>${s.hasAntDiff?` <span class="badge ttl">ANT</span>`:''}</td>
+      <td>${s.tac}</td><td>${s.pid}</td><td>${s.dch}</td>
+      <td>${s.cends.length}</td>
+      <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td>
+      <td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td>
+      <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
+      <td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?700:400}">${s.problemRate.toFixed(1)}%</td>
+      <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp+'dBm':'-'}</td>
+      <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr+'dB':'-'}</td>
+      <td style="color:${s.hasAntDiff?'#0e6655':'inherit'};font-weight:${s.hasAntDiff?700:400}">${s.antDiffDrops.length>0?s.antDiffDrops.length+'건 (최대 '+Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(0)+'dB)':'-'}</td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="13" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
@@ -496,18 +600,33 @@ function filterRaw(){
     if(feat&&r.Feature!==feat)return false;
     if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
     return true;
-  });rawPage=1;renderRaw();
+  });rawPage=1;rawOpenIdx=new Set();renderRaw();
 }
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
+const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','DLCh','RSRP','RxP0','RxP1','SNR0','SNR1','CINR'];
+const SKIP_KEYS=new Set(['Date','Time','Feature']);
+let rawOpenIdx=new Set();
+function toggleDetail(globalIdx){
+  const key=String(globalIdx);
+  if(rawOpenIdx.has(key))rawOpenIdx.delete(key);else rawOpenIdx.add(key);
+  renderRaw();
+}
 function renderRaw(){
-  const cols=allCols;
   const start=(rawPage-1)*RP,page=rawFiltered.slice(start,start+RP);
-  document.getElementById('rawHead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
-  document.getElementById('rawBody').innerHTML=page.length?page.map(r=>'<tr>'+cols.map(c=>{
-    const v=r[c]??'';
-    if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
-    return`<td>${String(v).length>30?String(v).slice(0,28)+'…':v}</td>`;
-  }).join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="no-data">데이터 없음</td></tr>';
+  document.getElementById('rawHead').innerHTML='<tr>'+RAW_FIXED.map(c=>`<th>${c}</th>`).join('')+'<th></th></tr>';
+  document.getElementById('rawBody').innerHTML=page.length?page.map((r,i)=>{
+    const gi=start+i;
+    const isOpen=rawOpenIdx.has(String(gi));
+    const mainRow='<tr>'+RAW_FIXED.map(c=>{
+      const v=r[c]??'';
+      if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
+      return`<td>${v}</td>`;
+    }).join('')+`<td><button class="det-btn" onclick="toggleDetail(${gi})" title="세부 정보">${isOpen?'▲':'▼'}</button></td></tr>`;
+    if(!isOpen)return mainRow;
+    const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
+    const detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
+    return mainRow+detailRow;
+  }).join(''):`<tr><td colspan="${RAW_FIXED.length+1}" class="no-data">데이터 없음</td></tr>`;
   const total=Math.ceil(rawFiltered.length/RP);
   let btns='';
   for(let p=Math.max(1,rawPage-2);p<=Math.min(total,rawPage+2);p++)
@@ -523,10 +642,11 @@ function exportCSV(){
   a.download='log_parsed.csv';a.click();
 }
 function showTab(name){
-  ['overview','station','mute','daily','trend','raw'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===name?'block':'none';});
-  document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['overview','station','mute','daily','trend','raw'][i]===name);});
+  ['overview','station','mute','drop','daily','trend','raw'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===name?'block':'none';});
+  document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['overview','station','mute','drop','daily','trend','raw'][i]===name);});
   if(name==='trend')renderTrend();
   if(name==='station')renderStationTable();
+  if(name==='drop')renderDropTab();
 }
 </script>
 </body>
