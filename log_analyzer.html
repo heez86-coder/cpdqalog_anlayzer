@@ -159,7 +159,7 @@ input[type=text]:focus,select:focus{border-color:#2980b9}
 </div>
 
 <script>
-let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={};
+let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
 const RP=20;let charts=[];
 const SOUND_TYPES=[
   {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김'},
@@ -235,7 +235,7 @@ function handleFile(file){
 }
 function loadSample(){doParse(SAMPLE,'sample.LOG');}
 function resetAll(){
-  allRows=[];charts.forEach(c=>c.destroy());charts=[];
+  allRows=[];allRlfEvents=[];rlfByRlfi={};charts.forEach(c=>c.destroy());charts=[];
   document.getElementById('dashboard').style.display='none';
   document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
@@ -287,10 +287,12 @@ function doParse(text,filename){
   }
   const ks=new Set();allRows.forEach(r=>Object.keys(r).forEach(k=>ks.add(k)));
   allCols=['Date','Time','Feature',...[...ks].filter(k=>!['Date','Time','Feature'].includes(k))];
+  buildRlfEvents();
   buildStationMap();
   document.getElementById('uploadBox').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('resetBtn').style.display='';
+  buildRlfEvents();
   stSortCol='default';stSortDir='desc';rawOpenIdx=new Set();
   renderHeader(filename);renderOverview();renderMuteTab();renderDropTab();renderDaily();initRaw();
   showTab('overview');
@@ -305,6 +307,35 @@ function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;
 function isOne(v){return v==='1'||v===1;}
 function getCellKey(tac,pid,dch){if(!tac&&!pid&&!dch)return null;return`${tac||'?'}|${pid||'?'}|${dch||'?'}`;}
 
+function buildRlfEvents(){
+  allRlfEvents=[];rlfByRlfi={};
+  byFeat('RLFI').forEach(r=>{
+    const [yr,mo]=r.Date.split('-');
+    const rlfiKey=`${r.Date}|${r.Time}`;
+    rlfByRlfi[rlfiKey]=[];
+    for(let i=1;i<=4;i++){
+      const tac=r[`TAC${i}`],pid=r[`PID${i}`],dch=r[`DCh${i}`];
+      if(!tac||!pid||!dch)continue;
+      const tim=(r[`TIM${i}`]||'').trim();
+      let date=r.Date,time=r.Time,timeCorrected=false;
+      if(tim.includes(',')){
+        const ci=tim.indexOf(',');
+        const dayStr=tim.slice(0,ci).trim(),timeStr=tim.slice(ci+1).trim();
+        if(dayStr&&timeStr){date=`${yr}-${mo}-${dayStr.padStart(2,'0')}`;time=timeStr;timeCorrected=true;}
+      }
+      const evt={Date:date,Time:time,Feature:'RLF',_rlfiKey:rlfiKey,_slot:i,_timeCorrected:timeCorrected,
+        TAC_:tac,PhID:pid,DLCh:dch,RxP0:r[`RxP${i}`],PLMN:r[`PLM${i}`]};
+      // 슬롯 전용 필드 복사 (TIM, ACT 등)
+      Object.keys(r).forEach(k=>{
+        if(!/\d$/.test(k)||k.slice(-1)!==String(i))return;
+        const base=k.slice(0,-1);
+        if(!['TAC','PID','DCh','RxP','PLM'].includes(base))evt[base]=r[k];
+      });
+      allRlfEvents.push(evt);
+      rlfByRlfi[rlfiKey].push(evt);
+    }
+  });
+}
 function buildStationMap(){
   stationMap={};
   const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',drops:[],mutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],rlfiRsrp:[],antDiffDrops:[]};};
@@ -328,16 +359,14 @@ function buildStationMap(){
         if(rsrp!==null)s.muteRsrp.push(rsrp);if(sinr!==null)s.muteSinr.push(sinr);
       }
     }
-    if(f==='RLFI'){
-      for(let i=1;i<=4;i++){
-        const tac=r[`TAC${i}`],pid=r[`PID${i}`],dch=r[`DCh${i}`];
-        if(!tac||!pid||!dch)continue;
-        const key=getCellKey(tac,pid,dch);if(!key)continue;
-        ensure(key);const s=stationMap[key];
-        s.tac=tac;s.pid=pid;s.dch=dch;s.rlfis.push(r);
-        const rxp=fNum(r[`RxP${i}`]);if(rxp!==null)s.rlfiRsrp.push(rxp);
-      }
-    }
+  });
+  // RLFI → 개별 RLF 이벤트로 스테이션 맵에 반영
+  allRlfEvents.forEach(e=>{
+    const key=getCellKey(e.TAC_,e.PhID,e.DLCh);if(!key)return;
+    ensure(key);const s=stationMap[key];
+    s.tac=e.TAC_;s.pid=e.PhID;s.dch=e.DLCh;
+    s.rlfis.push(e);
+    const rxp=fNum(e.RxP0);if(rxp!==null)s.rlfiRsrp.push(rxp);
   });
   Object.values(stationMap).forEach(s=>{
     const totalRef=s.cends.length+s.drops.length;
@@ -623,8 +652,34 @@ function renderRaw(){
       return`<td>${v}</td>`;
     }).join('')+`<td><button class="det-btn" onclick="toggleDetail(${gi})" title="세부 정보">${isOpen?'▲':'▼'}</button></td></tr>`;
     if(!isOpen)return mainRow;
-    const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
-    const detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
+    let detailRow;
+    if(r.Feature==='RLFI'){
+      const key=`${r.Date}|${r.Time}`;
+      const evts=rlfByRlfi[key]||[];
+      const thS='style="padding:4px 8px;background:#ddeeff;font-weight:600;font-size:11px;border-bottom:1px solid #c0d8f0"';
+      const tdS='style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8"';
+      const rows=evts.map((e,idx)=>{
+        const corrected=e._timeCorrected&&(e.Date!==r.Date||e.Time!==r.Time);
+        return`<tr>
+          <td ${tdS}>${idx+1}</td>
+          <td ${tdS} style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8;${corrected?'color:#2980b9;font-weight:600':''}">${e.Date}</td>
+          <td ${tdS} style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8;${corrected?'color:#2980b9;font-weight:600':''}">${e.Time}${corrected?` <span style="font-size:10px;color:#888">(보정)</span>`:''}</td>
+          <td ${tdS}>${e.TAC_}</td><td ${tdS}>${e.PhID}</td><td ${tdS}>${e.DLCh}</td>
+          <td ${tdS}>${e.RxP0??'-'}</td><td ${tdS}>${e.PLMN??'-'}</td>
+        </tr>`;
+      }).join('');
+      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}">
+        <div style="padding:10px 14px;background:#f0f6ff;border-top:1px solid #c8daf5">
+          <div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:6px">개별 RLF 이벤트 ${evts.length}건 (RLFI 이벤트시간: ${r.Date} ${r.Time})</div>
+          <table style="border-collapse:collapse;width:auto">
+            <thead><tr><th ${thS}>No</th><th ${thS}>실제 날짜</th><th ${thS}>실제 시간</th><th ${thS}>TAC</th><th ${thS}>PCI</th><th ${thS}>DLCh</th><th ${thS}>RxP</th><th ${thS}>PLMN</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div></td></tr>`;
+    } else {
+      const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
+      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
+    }
     return mainRow+detailRow;
   }).join(''):`<tr><td colspan="${RAW_FIXED.length+1}" class="no-data">데이터 없음</td></tr>`;
   const total=Math.ceil(rawFiltered.length/RP);
