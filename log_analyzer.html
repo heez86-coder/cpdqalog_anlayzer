@@ -199,9 +199,22 @@ const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101"
 function handleFile(file){
   if(!file)return;
   if(!/\.(log|txt)$/i.test(file.name)){alert('.LOG 또는 .TXT 파일만 업로드할 수 있습니다.');return;}
-  const reader=new FileReader();
-  reader.onload=e=>doParse(e.target.result,file.name);
-  reader.readAsText(file,'utf-8');
+  const tryParse=(encoding)=>new Promise((res,rej)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      let text=e.target.result;
+      if(text.charCodeAt(0)===0xFEFF)text=text.slice(1); // BOM 제거
+      res(text);
+    };
+    reader.onerror=rej;
+    reader.readAsText(file,encoding);
+  });
+  tryParse('utf-8').then(text=>{
+    const rows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
+    if(rows.length>0){doParse(text,file.name);return;}
+    // UTF-8 파싱 실패 시 EUC-KR 재시도
+    return tryParse('euc-kr').then(text2=>doParse(text2,file.name));
+  }).catch(()=>alert('파일을 읽을 수 없습니다.'));
 }
 function loadSample(){doParse(SAMPLE,'sample.LOG');}
 function resetAll(){
@@ -216,16 +229,32 @@ function resetAll(){
 }
 function parseLine(line){
   line=line.replace(/\r/g,'');
-  const ti=line.indexOf('\t');if(ti===-1)return null;
-  const pre=line.slice(0,ti).trim(),jp=line.slice(ti+1).trim();
-  const parts=pre.split(' ');if(parts.length<3)return null;
+  if(!line.trim())return null;
+  // JSON 시작 위치({) 탐색 — 탭 또는 공백 구분자 모두 지원
+  let pre,jp;
+  const ti=line.indexOf('\t');
+  const bi=line.indexOf('{');
+  if(ti!==-1&&(bi===-1||ti<bi)){
+    pre=line.slice(0,ti).trim();
+    jp=line.slice(ti+1).trim();
+  } else if(bi!==-1){
+    pre=line.slice(0,bi).trim();
+    jp=line.slice(bi).trim();
+  } else return null;
+  const parts=pre.trim().split(/\s+/);
+  if(parts.length<3)return null;
   let obj={};try{obj=JSON.parse(jp);}catch{return null;}
   return{Date:parts[0],Time:parts[1],Feature:parts.slice(2).join(' ').toUpperCase(),...obj};
 }
 function doParse(text,filename){
   if(!text||!text.trim()){alert('파일 내용이 비어있습니다.');return;}
+  // BOM 제거
+  if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
   allRows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
-  if(!allRows.length){alert('파싱 실패. 로그 형식을 확인해주세요.\n\n형식: 날짜 시간 Feature[탭]{JSON}');return;}
+  if(!allRows.length){
+    alert('파싱 실패. 로그 형식을 확인해주세요.\n\n지원 형식:\n날짜 시간 Feature{TAB}{JSON}\n날짜 시간 Feature {JSON}');
+    return;
+  }
   const ks=new Set();allRows.forEach(r=>Object.keys(r).forEach(k=>ks.add(k)));
   allCols=['Date','Time','Feature',...[...ks].filter(k=>!['Date','Time','Feature'].includes(k))];
   buildStationMap();
