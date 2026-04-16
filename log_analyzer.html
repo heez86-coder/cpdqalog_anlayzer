@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>네트워크 품질 로그 분석기</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:14px}
+.wrap{max-width:1200px;margin:0 auto;padding:1.5rem}
+.btn{padding:7px 14px;border:1px solid #ccc;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;color:#444}
+.btn:hover{background:#f0f0f0}
+.btn-p{background:#e8e8e8;color:#111;border-color:#aaa;font-weight:500}
+.st{font-size:11px;font-weight:600;color:#888;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;margin-top:1.25rem}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:.5rem}
+.mc{background:#fff;border-radius:8px;padding:12px 14px;border:1px solid #e8e8e8}
+.ml{font-size:11px;color:#888;margin-bottom:4px}
+.mv{font-size:20px;font-weight:600;color:#111;line-height:1.2}
+.ms{font-size:11px;color:#aaa;margin-top:3px}
+.danger .mv{color:#c0392b}
+.warn .mv{color:#b7640a}
+.tab-bar{display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid #ddd;flex-wrap:wrap;background:#fff;border-radius:10px 10px 0 0;padding:0 1rem}
+.tab{padding:10px 14px;font-size:13px;cursor:pointer;color:#888;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;border-top:none;border-left:none;border-right:none}
+.tab:hover{color:#333}
+.tab.active{color:#1a1a1a;font-weight:600;border-bottom-color:#2980b9}
+.paste-box{border:2px dashed #ccc;border-radius:10px;padding:1.25rem;margin-bottom:1.5rem;background:#fafafa}
+.paste-box textarea{width:100%;height:160px;padding:10px;font-size:12px;font-family:'Consolas','Courier New',monospace;border:1px solid #ddd;border-radius:8px;background:#fff;color:#111;resize:vertical;line-height:1.5}
+.tw{overflow-x:auto;border:1px solid #e0e0e0;border-radius:10px}
+table{border-collapse:collapse;font-size:12px;width:100%}
+thead th{background:#f5f5f5;padding:9px 11px;text-align:left;font-weight:600;color:#666;font-size:11px;border-bottom:1px solid #e0e0e0;white-space:nowrap}
+tbody tr{border-bottom:1px solid #f0f0f0}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#fafafa}
+tbody td{padding:8px 11px;color:#222;font-size:12px;white-space:nowrap}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.nc{border:1px solid #e8e8e8;border-radius:10px;padding:1rem 1.25rem;margin-bottom:10px;background:#fff}
+.nc.critical{border-left:4px solid #e74c3c}
+.nc.warning{border-left:4px solid #e67e22}
+.nc.weak{border-left:4px solid #8e44ad}
+.nc.antdiff{border-left:4px solid #16a085}
+.nc.mic{border-left:4px solid #c0392b}
+.nt{font-size:13px;font-weight:600;color:#111}
+.ns{font-size:12px;color:#666}
+.ntags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:500}
+.tr{background:#fdecea;color:#c0392b}
+.ta{background:#fef3e2;color:#b7640a}
+.tb{background:#e8f4fd;color:#1a6fa0}
+.tp{background:#f4ecfd;color:#6c3483}
+.tg{background:#f5f5f5;color:#555}
+.tgr{background:#eafaf1;color:#1e8449}
+.ttl{background:#e8f8f5;color:#0e6655}
+.tpk{background:#fdf2f8;color:#943672}
+.cat-box{border:1px solid #e8e8e8;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;background:#fff}
+.cat-title{font-size:13px;font-weight:600;color:#111;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-label{font-size:12px;color:#666;width:145px;flex-shrink:0}
+.bar-track{flex:1;background:#f0f0f0;border-radius:4px;height:14px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.bar-val{font-size:12px;font-weight:500;color:#222;min-width:200px;flex-shrink:0}
+.ecnt-high{color:#c0392b;font-weight:700}
+.divider{border:none;border-top:1px solid #eee;margin:1.25rem 0}
+.header-card{background:#fff;border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem;border:1px solid #e8e8e8}
+.tab-content{background:#fff;border-radius:0 0 10px 10px;padding:1.25rem 1.5rem;border:1px solid #ddd;border-top:none}
+input[type=text],select{padding:7px 10px;font-size:13px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;outline:none}
+input[type=text]:focus,select:focus{border-color:#2980b9}
+.no-data{text-align:center;padding:2rem;color:#aaa;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="header-card">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:18px;font-weight:700;color:#111" id="logTitle">네트워크 품질 로그 분석기</div>
+      <div style="font-size:12px;color:#888;margin-top:3px" id="logSub">로그 파일을 붙여넣어 분석을 시작하세요</div>
+    </div>
+    <button class="btn btn-p" onclick="togglePaste()">로그 붙여넣기</button>
+    <button class="btn" onclick="loadSample()">샘플 데이터</button>
+    <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
+  </div>
+  <div class="paste-box" id="pasteBox" style="display:none;margin-top:1rem;margin-bottom:0">
+    <div style="font-size:12px;color:#888;margin-bottom:8px">메모장(notepad)에서 로그 내용을 복사(Ctrl+A → Ctrl+C)한 후 아래에 붙여넣으세요 (Ctrl+V)</div>
+    <textarea id="pasteInput" placeholder="2026-04-05 11:03:57 CEND&#9;{&quot;JVER&quot;:&quot;SYH1&quot;, &quot;Ctype&quot;:&quot;4&quot;, ...}"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn btn-p" onclick="doParse()">분석 시작</button>
+      <button class="btn" onclick="togglePaste()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="dashboard" style="display:none">
+  <div class="tab-bar">
+    <button class="tab active" onclick="showTab('overview')">전체 요약</button>
+    <button class="tab" onclick="showTab('station')">문제 기지국</button>
+    <button class="tab" onclick="showTab('mute')">MUTE 분석</button>
+    <button class="tab" onclick="showTab('daily')">일별 상세</button>
+    <button class="tab" onclick="showTab('trend')">추이 그래프</button>
+    <button class="tab" onclick="showTab('raw')">원본 데이터</button>
+  </div>
+  <div class="tab-content">
+    <div id="tab-overview">
+      <div class="st">통화 품질</div><div class="mg" id="callM"></div>
+      <div class="st">무선 품질</div><div class="mg" id="radioM"></div>
+      <div class="st">단말 / 기타</div><div class="mg" id="devM"></div>
+      <div class="divider"></div>
+      <div class="st">이상 감지 알림</div><div id="notiArea"></div>
+    </div>
+    <div id="tab-station" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="stSearch" placeholder="TAC / PCI / 채널 검색..." oninput="renderStationTable()" style="flex:1;min-width:140px">
+        <select id="stFilter" onchange="renderStationTable()">
+          <option value="">전체</option><option value="critical">위험</option>
+          <option value="warning">주의</option><option value="weak">약전계</option>
+          <option value="antdiff">Ant Diff</option><option value="normal">정상</option>
+        </select>
+      </div>
+      <div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
+      <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
+    </div>
+    <div id="tab-mute" style="display:none"><div id="muteContent"></div></div>
+    <div id="tab-daily" style="display:none"><div id="dailyContent"></div></div>
+    <div id="tab-trend" style="display:none"><div id="trendContent"></div></div>
+    <div id="tab-raw" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input type="text" id="rawSearch" placeholder="검색..." oninput="filterRaw()" style="flex:1;min-width:140px">
+        <select id="rawFeat" onchange="filterRaw()"><option value="">모든 Feature</option></select>
+        <button class="btn" onclick="exportCSV()">CSV 내보내기</button>
+      </div>
+      <div class="tw"><table><thead id="rawHead"></thead><tbody id="rawBody"></tbody></table></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:#888" id="rawPager"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={};
+const RP=20;let charts=[];
+const SOUND_TYPES=[
+  {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김'},
+  {key:'RNMT',label:'RxNodata Mute',color:'#2980b9',tag:'tb',desc:'수신 데이터 없음'},
+  {key:'DBMT',label:'DL BLER Mute',color:'#e67e22',tag:'ta',desc:'다운링크 BLER≥40%',bler:true},
+  {key:'UBMT',label:'UL BLER Mute',color:'#8e44ad',tag:'tp',desc:'업링크 BLER≥40%',bler:true},
+];
+const MIC_TYPES=[
+  {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
+  {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
+  {key:'MCST',label:'MIC 입력신호 이상',color:'#922b21',tag:'tr',desc:'HW 이상 의심'},
+];
+const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-05 10:05:33 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-105","RxP1":"-108","SNR0":"-2","SNR1":"-3"}
+2026-04-05 11:03:57 CEND\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","Ctype":"4"}
+2026-04-05 12:14:22 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-103","CINR":"-1","RSMT":"1","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"3","BLER":"0"}
+2026-04-05 13:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-101","CINR":"-2","RSMT":"0","RNMT":"0","DBMT":"1","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"7","BLER":"52"}
+2026-04-05 13:30:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-05 14:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-99","CINR":"1","RSMT":"0","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"1","SMBU":"0","MCST":"0","ECNT":"2","BLER":"0"}
+2026-04-05 14:30:00 MUTE\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","RSRP":"-88","CINR":"2","RSMT":"0","RNMT":"1","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"1","BLER":"0"}
+2026-04-05 14:55:11 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-102","RxP1":"-125","SNR0":"-1","SNR1":"-2"}
+2026-04-05 15:20:00 RLFI\t{"PLM1":"45005#","TAC1":"338","PID1":"101","RxP1":"-104","DCh1":"1850","PLM2":"45005#","TAC2":"340","PID2":"202","RxP2":"-88","DCh2":"1900","PLM3":"45008#","TAC3":"341","PID3":"303","RxP3":"-78","DCh3":"2100","PLM4":"45005#","TAC4":"338","PID4":"101","RxP4":"-107","DCh4":"1850"}
+2026-04-05 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"8","LDCH":"420","PLMN":"45005#"}
+2026-04-06 08:30:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-06 09:15:00 CEND\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","Ctype":"4"}
+2026-04-06 10:00:00 DROP\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","RxP0":"-98","RxP1":"-101","SNR0":"2","SNR1":"1"}
+2026-04-06 11:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-105","CINR":"-3","RSMT":"0","RNMT":"0","DBMT":"0","UBMT":"1","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"6","BLER":"61"}
+2026-04-06 11:20:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-06 12:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-101","CINR":"-2","RSMT":"1","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"8","BLER":"0"}
+2026-04-06 12:30:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-100","CINR":"-1","RSMT":"0","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"1","ECNT":"4","BLER":"0"}
+2026-04-06 14:10:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-06 15:00:00 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-97","RxP1":"-122","SNR0":"1","SNR1":"0"}
+2026-04-06 15:30:00 CRSH\t{"JVER":"SYH1","Ctype":"1","PLMN":"45005#"}
+2026-04-06 16:00:00 RLFI\t{"PLM1":"45005#","TAC1":"338","PID1":"101","RxP1":"-106","DCh1":"1850","PLM2":"45005#","TAC2":"338","PID2":"101","RxP2":"-109","DCh2":"1850","PLM3":"45005#","TAC3":"340","PID3":"202","RxP3":"-90","DCh3":"1900","PLM4":"45008#","TAC4":"341","PID4":"303","RxP4":"-75","DCh4":"2100"}
+2026-04-06 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"12","LDCH":"450","PLMN":"45005#"}
+2026-04-07 08:00:00 CEND\t{"JVER":"SYH1","TAC_":"341","PhID":"303","DLCh":"2100","Ctype":"4"}
+2026-04-07 09:10:00 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-107","RxP1":"-110","SNR0":"-3","SNR1":"-4"}
+2026-04-07 10:00:00 MUTE\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","RSRP":"-96","CINR":"1","RSMT":"0","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"1","SMBU":"0","MCST":"0","ECNT":"5","BLER":"0"}
+2026-04-07 10:20:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-07 11:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-98","CINR":"-1","RSMT":"0","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"1","MCST":"0","ECNT":"3","BLER":"0"}
+2026-04-07 12:30:00 CEND\t{"JVER":"SYH1","TAC_":"340","PhID":"202","DLCh":"1900","Ctype":"4"}
+2026-04-07 13:00:00 RLFI\t{"PLM1":"45005#","TAC1":"338","PID1":"101","RxP1":"-108","DCh1":"1850","PLM2":"45005#","TAC2":"340","PID2":"202","RxP2":"-85","DCh2":"1900","PLM3":"","TAC3":"","PID3":"","RxP3":"","DCh3":"","PLM4":"","TAC4":"","PID4":"","RxP4":"","DCh4":""}
+2026-04-07 13:45:00 SIMD\t{"JVER":"SYH1","Ctype":"2","PLMN":"45005#"}
+2026-04-07 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"5","LDCH":"430","PLMN":"45005#"}
+2026-04-08 08:20:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-08 09:40:00 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
+2026-04-08 10:50:00 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-99","RxP1":"-103","SNR0":"1","SNR1":"0"}
+2026-04-08 11:00:00 MUTE\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RSRP":"-102","CINR":"-2","RSMT":"1","RNMT":"0","DBMT":"0","UBMT":"0","SAMS":"0","SMBU":"0","MCST":"0","ECNT":"9","BLER":"0"}
+2026-04-08 11:30:00 CEND\t{"JVER":"SYH1","TAC_":"341","PhID":"303","DLCh":"2100","Ctype":"4"}
+2026-04-08 14:00:00 DAST\t{"JVER":"SYH1","Ctype":"3","PLMN":"45005#"}
+2026-04-08 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"9","LDCH":"410","PLMN":"45005#"}`;
+
+function togglePaste(){const e=document.getElementById('pasteBox');e.style.display=e.style.display==='none'?'block':'none';}
+function loadSample(){document.getElementById('pasteInput').value=SAMPLE;document.getElementById('pasteBox').style.display='block';doParse();}
+function resetAll(){
+  allRows=[];charts.forEach(c=>c.destroy());charts=[];
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('resetBtn').style.display='none';
+  document.getElementById('logTitle').textContent='네트워크 품질 로그 분석기';
+  document.getElementById('logSub').textContent='로그 파일을 붙여넣어 분석을 시작하세요';
+}
+function parseLine(line){
+  line=line.replace(/\r/g,'');
+  const ti=line.indexOf('\t');if(ti===-1)return null;
+  const pre=line.slice(0,ti).trim(),jp=line.slice(ti+1).trim();
+  const parts=pre.split(' ');if(parts.length<3)return null;
+  let obj={};try{obj=JSON.parse(jp);}catch{return null;}
+  return{Date:parts[0],Time:parts[1],Feature:parts.slice(2).join(' ').toUpperCase(),...obj};
+}
+function doParse(){
+  const text=document.getElementById('pasteInput').value.trim();if(!text)return;
+  allRows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
+  if(!allRows.length){alert('파싱 실패. 로그 형식을 확인해주세요.\n\n형식: 날짜 시간 Feature[탭]{JSON}');return;}
+  const ks=new Set();allRows.forEach(r=>Object.keys(r).forEach(k=>ks.add(k)));
+  allCols=['Date','Time','Feature',...[...ks].filter(k=>!['Date','Time','Feature'].includes(k))];
+  buildStationMap();
+  document.getElementById('pasteBox').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  document.getElementById('resetBtn').style.display='';
+  renderHeader();renderOverview();renderMuteTab();renderDaily();initRaw();
+  showTab('overview');
+}
+function getDates(){return[...new Set(allRows.map(r=>r.Date))].sort();}
+function byDate(d){return allRows.filter(r=>r.Date===d);}
+function byFeat(f,rows){return(rows||allRows).filter(r=>r.Feature===f);}
+function cnt(f,rows){return byFeat(f,rows).length;}
+function pct(n,d){return d===0?'0.0':((n/d)*100).toFixed(1);}
+function fNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
+function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;}
+function isOne(v){return v==='1'||v===1;}
+function getCellKey(tac,pid,dch){if(!tac&&!pid&&!dch)return null;return`${tac||'?'}|${pid||'?'}|${dch||'?'}`;}
+
+function buildStationMap(){
+  stationMap={};
+  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',drops:[],mutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],rlfiRsrp:[],antDiffDrops:[]};};
+  allRows.forEach(r=>{
+    const f=r.Feature;
+    if(['CEND','DROP','MUTE'].includes(f)){
+      const key=getCellKey(r.TAC_,r.PhID,r.DLCh);if(!key)return;
+      ensure(key);const s=stationMap[key];
+      s.tac=r.TAC_||s.tac;s.pid=r.PhID||s.pid;s.dch=r.DLCh||s.dch;
+      if(f==='CEND')s.cends.push(r);
+      if(f==='DROP'){
+        s.drops.push(r);
+        const rsrp=fNum(r.RxP0),sinr=fNum(r.SNR0);
+        if(rsrp!==null)s.dropRsrp.push(rsrp);if(sinr!==null)s.dropSinr.push(sinr);
+        const r0=fNum(r.RxP0),r1=fNum(r.RxP1);
+        if(r0!==null&&r1!==null&&Math.abs(r0-r1)>=20)s.antDiffDrops.push({...r,diff:Math.abs(r0-r1)});
+      }
+      if(f==='MUTE'){
+        s.mutes.push(r);
+        const rsrp=fNum(r.RSRP),sinr=fNum(r.CINR);
+        if(rsrp!==null)s.muteRsrp.push(rsrp);if(sinr!==null)s.muteSinr.push(sinr);
+      }
+    }
+    if(f==='RLFI'){
+      for(let i=1;i<=4;i++){
+        const tac=r[`TAC${i}`],pid=r[`PID${i}`],dch=r[`DCh${i}`];
+        if(!tac||!pid||!dch)continue;
+        const key=getCellKey(tac,pid,dch);if(!key)continue;
+        ensure(key);const s=stationMap[key];
+        s.tac=tac;s.pid=pid;s.dch=dch;s.rlfis.push(r);
+        const rxp=fNum(r[`RxP${i}`]);if(rxp!==null)s.rlfiRsrp.push(rxp);
+      }
+    }
+  });
+  Object.values(stationMap).forEach(s=>{
+    const totalRef=s.cends.length+s.drops.length;
+    s.probCount=s.drops.length+s.mutes.length+s.rlfis.length;
+    s.problemRate=totalRef>0?((s.drops.length+s.mutes.length)/totalRef*100):0;
+    const allRsrp=[...s.dropRsrp,...s.muteRsrp,...s.rlfiRsrp];
+    const allSinr=[...s.dropSinr,...s.muteSinr];
+    s.avgRsrp=allRsrp.length?parseFloat(avgArr(allRsrp).toFixed(1)):null;
+    s.avgSinr=allSinr.length?parseFloat(avgArr(allSinr).toFixed(1)):null;
+    s.weakRsrp=s.avgRsrp!==null&&s.avgRsrp<-100;
+    s.weakSinr=s.avgSinr!==null&&s.avgSinr<0;
+    s.isWeak=s.weakRsrp||s.weakSinr;
+    s.hasAntDiff=s.antDiffDrops.length>=2;
+    if(s.probCount>=3&&s.problemRate>=30)s.level='critical';
+    else if(s.probCount>=2||s.problemRate>=15)s.level='warning';
+    else if(s.isWeak&&s.probCount>=1)s.level='weak';
+    else s.level='normal';
+  });
+}
+
+function renderHeader(){
+  const dates=getDates();
+  const antCnt=Object.values(stationMap).filter(s=>s.hasAntDiff).length;
+  const micCnt=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>isOne(r[t.key]))).length;
+  document.getElementById('logTitle').textContent=`로그 : ${dates[0]} ~ ${dates[dates.length-1]} (${dates.length}일치 데이터 분석)`;
+  document.getElementById('logSub').textContent=`총 ${allRows.length.toLocaleString()}건 이벤트 · Feature ${[...new Set(allRows.map(r=>r.Feature))].length}종 · 기지국 ${Object.keys(stationMap).length}개 감지${antCnt>0?' · ⚠ Ant Diff 의심 '+antCnt+'개':''}${micCnt>0?' · ⚠ 마이크 이상 '+micCnt+'건':''}`;
+}
+function calcKPI(rows){
+  const cend=cnt('CEND',rows),drop=cnt('DROP',rows),mute=cnt('MUTE',rows),total=cend+drop;
+  const rlfcRows=byFeat('RLFC',rows);
+  let lrlf=0,ldch=0;rlfcRows.forEach(r=>{lrlf+=parseFloat(r.LRLF||0);ldch+=parseFloat(r.LDCH||0);});
+  return{cend,drop,mute,total,dropRate:pct(drop,total),muteRate:pct(mute,cend),lrlf,ldch,rlfRate:pct(lrlf,ldch),
+    crsh:cnt('CRSH',rows),simd:cnt('SIMD',rows),dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows)};
+}
+function mCard(label,val,sub,cls){return`<div class="mc${cls?' '+cls:''}"><div class="ml">${label}</div><div class="mv">${val}</div>${sub?`<div class="ms">${sub}</div>`:''}</div>`;}
+function renderOverview(){
+  const k=calcKPI(allRows);
+  document.getElementById('callM').innerHTML=
+    mCard('총 통화횟수',k.total.toLocaleString()+'건')+
+    mCard('Calldrop',k.drop+'건',`발생률 ${k.dropRate}%`,parseFloat(k.dropRate)>1?'danger':'')+
+    mCard('MUTE 발생',k.mute+'건',`발생률 ${k.muteRate}%`,parseFloat(k.muteRate)>1?'danger':'');
+  document.getElementById('radioM').innerHTML=
+    mCard('RLF 발생',k.lrlf+'건',`RLF율 ${k.rlfRate}%`,parseFloat(k.rlfRate)>2?'warn':'')+
+    mCard('DAST',k.dast+'건','Data Stall')+
+    mCard('RFPD',k.rfpd+'건','Tx PD Power')+
+    mCard('MMRJ',k.mmrj+'건','MM Reject');
+  document.getElementById('devM').innerHTML=
+    mCard('CP Crash',k.crsh+'건','',k.crsh>0?'danger':'')+
+    mCard('SIM 탈착',k.simd+'건','');
+  renderNoti();
+}
+
+function renderNoti(){
+  let html='';
+  const micRows=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>isOne(r[t.key])));
+  if(micRows.length>0){
+    const samsCnt=micRows.filter(r=>isOne(r.SAMS)).length;
+    const smbuCnt=micRows.filter(r=>isOne(r.SMBU)).length;
+    const mcstCnt=micRows.filter(r=>isOne(r.MCST)).length;
+    html+=`<div class="nc mic"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge tpk">마이크 이상 감지</span><span class="nt">마이크 관련 MUTE ${micRows.length}건 발생</span></div><div class="ns" style="margin-top:6px">통화 품질과 무관한 마이크 하드웨어/사용자 원인 이상</div><div class="ntags">${samsCnt?`<span class="tag tpk">대체 마이크 스위칭 ${samsCnt}건</span>`:''}${smbuCnt?`<span class="tag tg">마이크 막힘 ${smbuCnt}건</span>`:''}${mcstCnt?`<span class="tag tr">MIC 입력신호 이상 ${mcstCnt}건</span>`:''}</div></div>`;
+  }
+  const antDiffSt=Object.values(stationMap).filter(s=>s.hasAntDiff).sort((a,b)=>b.antDiffDrops.length-a.antDiffDrops.length);
+  antDiffSt.forEach(s=>{
+    const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
+    html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
+  });
+  const stations=Object.values(stationMap).filter(s=>s.level!=='normal').sort((a,b)=>{const o={critical:0,warning:1,weak:2};return(o[a.level]||9)-(o[b.level]||9)||(b.probCount-a.probCount);});
+  const lbl={critical:'위험',warning:'주의',weak:'약전계'};
+  const lc={critical:'tr',warning:'ta',weak:'tp'};
+  stations.forEach(s=>{
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건 · 이상률 ${s.problemRate.toFixed(1)}%${s.avgRsrp!==null?' · RSRP '+s.avgRsrp+'dBm':''}${s.avgSinr!==null?' / SINR '+s.avgSinr+'dB':''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLFI ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}dBm</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}dB</span>`:''}${s.hasAntDiff?`<span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>`:''}</div></div>`;
+  });
+  document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
+}
+
+function renderMuteTab(){
+  const muteRows=byFeat('MUTE');
+  const total=muteRows.length;
+  if(!total){document.getElementById('muteContent').innerHTML='<div class="no-data">MUTE 데이터가 없습니다.</div>';return;}
+  const soundRows=muteRows.filter(r=>SOUND_TYPES.some(t=>isOne(r[t.key])));
+  const micRowsAll=muteRows.filter(r=>MIC_TYPES.some(t=>isOne(r[t.key])));
+  const unknownRows=muteRows.filter(r=>![...SOUND_TYPES,...MIC_TYPES].some(t=>isOne(r[t.key])));
+  function buildCat(title,types,rows,badgeCls){
+    const catTotal=rows.length;
+    let h=`<div class="cat-box"><div class="cat-title"><span class="badge ${badgeCls}">${title}</span><span style="font-size:12px;color:#888">${catTotal}건</span></div>`;
+    const maxN=Math.max(...types.map(t=>rows.filter(r=>isOne(r[t.key])).length),1);
+    types.forEach(t=>{
+      const tRows=rows.filter(r=>isOne(r[t.key]));const n=tRows.length;
+      const p=total>0?(n/total*100):0;
+      const ecnts=tRows.map(r=>fNum(r.ECNT)).filter(v=>v!==null);
+      const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
+      const highE=ecnts.filter(v=>v>=5).length;
+      const blers=t.bler?tRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0):[];
+      const avgBler=blers.length?avgArr(blers).toFixed(1):null;
+      h+=`<div class="bar-row"><div class="bar-label">${t.label}<br><span style="font-size:11px;color:#aaa">${t.desc}</span></div><div class="bar-track"><div class="bar-fill" style="width:${maxN>0?(n/maxN*100).toFixed(1):0}%;background:${t.color}"></div></div><div class="bar-val">${n}건 (${p.toFixed(1)}%)${n>0?`&nbsp;<span style="font-size:11px;color:#888">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span>`:''}${avgBler!==null?`&nbsp;<span style="font-size:11px;color:#b7640a">BLER avg ${avgBler}%</span>`:''}</div></div>`;
+    });
+    return h+'</div>';
+  }
+  let html=`<div class="st">전체 기간 MUTE 유형 분포</div><div class="mg">${mCard('전체 MUTE',total+'건','')}${mCard('음질 이상',soundRows.length+'건',pct(soundRows.length,total)+'%')}${mCard('마이크 이상',micRowsAll.length+'건',pct(micRowsAll.length,total)+'%',micRowsAll.length>0?'warn':'')}${unknownRows.length>0?mCard('유형 미분류',unknownRows.length+'건',''):''}</div>`;
+  html+=buildCat('음질 이상',SOUND_TYPES,soundRows,'ta');
+  html+=buildCat('마이크 이상',MIC_TYPES,micRowsAll,'tpk');
+  html+=`<div class="divider"></div><div class="st">일별 MUTE 유형 현황</div>`;
+  getDates().forEach(d=>{
+    const dRows=byFeat('MUTE',byDate(d));if(!dRows.length)return;
+    html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · MUTE ${dRows.length}건</div><div class="mg">`;
+    [...SOUND_TYPES,...MIC_TYPES].forEach(t=>{
+      const n=dRows.filter(r=>isOne(r[t.key])).length;if(!n)return;
+      const ecnts=dRows.filter(r=>isOne(r[t.key])).map(r=>fNum(r.ECNT)).filter(v=>v!==null);
+      const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
+      const highE=ecnts.filter(v=>v>=5).length;
+      html+=`<div class="mc"><div class="ml">${t.label}</div><div class="mv">${n}건</div><div class="ms">ECNT avg ${avgE}${highE>0?` · <span class="ecnt-high">≥5: ${highE}건</span>`:''}</div></div>`;
+    });
+    html+=`</div></div>`;
+  });
+  document.getElementById('muteContent').innerHTML=html;
+}
+
+function renderStationTable(){
+  const q=(document.getElementById('stSearch').value||'').toLowerCase();
+  const lv=document.getElementById('stFilter').value;
+  const all=Object.values(stationMap).filter(s=>{
+    if(lv==='antdiff')return s.hasAntDiff;
+    if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
+    if(q&&!`${s.tac}${s.pid}${s.dch}`.toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>{const o={critical:0,warning:1,weak:2,normal:3};return(o[a.level]||9)-(o[b.level]||9)||(b.probCount-a.probCount);});
+  const lbl={critical:'위험',warning:'주의',weak:'약전계',normal:'정상'};
+  const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
+  document.getElementById('stHead').innerHTML=`<tr><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th><th>CEND</th><th>DROP</th><th>MUTE</th><th>RLFI</th><th>이상률</th><th>avg RSRP</th><th>avg SINR</th><th>Ant Diff</th></tr>`;
+  document.getElementById('stBody').innerHTML=all.length?all.map(s=>`<tr><td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span>${s.hasAntDiff?` <span class="badge ttl">ANT</span>`:''}</td><td>${s.tac}</td><td>${s.pid}</td><td>${s.dch}</td><td>${s.cends.length}</td><td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td><td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td><td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td><td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?'700':'400'}">${s.problemRate.toFixed(1)}%</td><td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp+'dBm':'-'}</td><td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr+'dB':'-'}</td><td style="color:${s.hasAntDiff?'#0e6655':'inherit'};font-weight:${s.hasAntDiff?'700':'400'}">${s.antDiffDrops.length>0?s.antDiffDrops.length+'건 (최대 '+Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(0)+'dB)':'-'}</td></tr>`).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
+}
+function renderDaily(){
+  const dates=getDates();let html='';
+  dates.forEach(d=>{
+    const rows=byDate(d);const k=calcKPI(rows);
+    html+=`<div style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid #eee"><div class="st">${d}</div><div class="mg">${mCard('통화횟수',k.total+'건')}${mCard('Calldrop',k.drop+'건',k.dropRate+'%',parseFloat(k.dropRate)>1?'danger':'')}${mCard('MUTE',k.mute+'건',k.muteRate+'%',parseFloat(k.muteRate)>1?'danger':'')}${mCard('RLF율',k.rlfRate+'%',`LRLF ${k.lrlf} / LDCH ${k.ldch}`,parseFloat(k.rlfRate)>2?'warn':'')}${mCard('Crash',k.crsh+'건','',k.crsh>0?'danger':'')}${mCard('DAST',k.dast+'건','')}</div></div>`;
+  });
+  document.getElementById('dailyContent').innerHTML=html;
+}
+function renderTrend(){
+  const dates=getDates();
+  const dr=[],mr=[],rr=[],cc=[];
+  dates.forEach(d=>{const k=calcKPI(byDate(d));dr.push(parseFloat(k.dropRate));mr.push(parseFloat(k.muteRate));rr.push(parseFloat(k.rlfRate));cc.push(k.total);});
+  const labels=dates.map(d=>d.slice(5));
+  document.getElementById('trendContent').innerHTML=`<div class="st">일별 발생률 추이 (%)</div><div style="position:relative;height:240px;margin-bottom:2rem"><canvas id="c1"></canvas></div><div class="st">일별 통화횟수</div><div style="position:relative;height:200px"><canvas id="c2"></canvas></div>`;
+  setTimeout(()=>{
+    charts.forEach(c=>c.destroy());charts=[];
+    charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[{label:'Calldrop율',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e74c3c',borderWidth:2.5},{label:'MUTE율',data:mr,borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e67e22',borderWidth:2.5},{label:'RLF율',data:rr,borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#2980b9',borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true}},scales:{x:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}},y:{ticks:{font:{size:12},callback:v=>v.toFixed(1)+'%'},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+    charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[{label:'통화횟수',data:cc,backgroundColor:'#aed6f1',borderColor:'#2980b9',borderWidth:1.5,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+  },100);
+}
+
+function initRaw(){
+  const feats=[...new Set(allRows.map(r=>r.Feature))].sort();
+  document.getElementById('rawFeat').innerHTML='<option value="">모든 Feature</option>'+feats.map(f=>`<option value="${f}">${f}</option>`).join('');
+  rawFiltered=[...allRows];rawPage=1;renderRaw();
+}
+function filterRaw(){
+  const q=document.getElementById('rawSearch').value.toLowerCase();
+  const feat=document.getElementById('rawFeat').value;
+  rawFiltered=allRows.filter(r=>{
+    if(feat&&r.Feature!==feat)return false;
+    if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
+    return true;
+  });rawPage=1;renderRaw();
+}
+const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
+function renderRaw(){
+  const cols=allCols.slice(0,10);
+  const start=(rawPage-1)*RP,page=rawFiltered.slice(start,start+RP);
+  document.getElementById('rawHead').innerHTML='<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.getElementById('rawBody').innerHTML=page.length?page.map(r=>'<tr>'+cols.map(c=>{
+    const v=r[c]??'';
+    if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
+    return`<td>${String(v).length>30?String(v).slice(0,28)+'…':v}</td>`;
+  }).join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'" class="no-data">데이터 없음</td></tr>';
+  const total=Math.ceil(rawFiltered.length/RP);
+  let btns='';
+  for(let p=Math.max(1,rawPage-2);p<=Math.min(total,rawPage+2);p++)
+    btns+=`<button class="btn${p===rawPage?' btn-p':''}" style="padding:5px 11px;font-size:12px;margin:0 2px" onclick="rawGo(${p})">${p}</button>`;
+  document.getElementById('rawPager').innerHTML=`<span>${rawFiltered.length}건 / 전체 ${allRows.length}건</span><div>${btns}</div>`;
+}
+function rawGo(p){rawPage=p;renderRaw();}
+function exportCSV(){
+  const esc=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const csv=[allCols.join(','),...rawFiltered.map(r=>allCols.map(c=>esc(r[c])).join(','))].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download='log_parsed.csv';a.click();
+}
+function showTab(name){
+  ['overview','station','mute','daily','trend','raw'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===name?'block':'none';});
+  document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['overview','station','mute','daily','trend','raw'][i]===name);});
+  if(name==='trend')renderTrend();
+  if(name==='station')renderStationTable();
+}
+</script>
+</body>
+</html>
