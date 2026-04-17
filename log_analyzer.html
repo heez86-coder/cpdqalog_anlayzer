@@ -546,7 +546,7 @@ function renderMuteTab(){
       const highE=ecnts.filter(v=>v>=5).length;
       const blers=t.bler?tRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0):[];
       const avgBler=blers.length?avgArr(blers).toFixed(1):null;
-      h+=`<div class="bar-row"><div class="bar-label">${t.label}<br><span style="font-size:11px;color:#aaa">${t.desc}</span></div><div class="bar-track"><div class="bar-fill" style="width:${maxN>0?(n/maxN*100).toFixed(1):0}%;background:${t.color}"></div></div><div class="bar-val">${n}건 (${p.toFixed(1)}%)${n>0?`&nbsp;<span style="font-size:11px;color:#888">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span>`:''}${avgBler!==null?`&nbsp;<span style="font-size:11px;color:#b7640a">BLER avg ${avgBler}%</span>`:''}</div></div>`;
+      h+=`<div class="bar-row"><div class="bar-label"><span style="font-size:10px;font-weight:700;color:var(--blue-600);margin-right:4px">[${t.key}]</span>${t.label}<br><span style="font-size:11px;color:#aaa">${t.desc}</span></div><div class="bar-track"><div class="bar-fill" style="width:${maxN>0?(n/maxN*100).toFixed(1):0}%;background:${t.color}"></div></div><div class="bar-val">${n}건 (${p.toFixed(1)}%)${n>0?`&nbsp;<span style="font-size:11px;color:#888">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span>`:''}${avgBler!==null?`&nbsp;<span style="font-size:11px;color:#b7640a">BLER avg ${avgBler}%</span>`:''}</div></div>`;
     });
     return h+'</div>';
   }
@@ -630,7 +630,7 @@ function renderDropTab(){
       const adCnt=s.antDiffDrops.length;
       const wkCnt=s.drops.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100).length;
       html+=`<div class="bar-row">
-        <div class="bar-label" style="width:180px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid}<br><span style="font-size:11px;color:#aaa">CH ${s.dch}</span></div>
+        <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/maxD*100).toFixed(1)}%;background:#e74c3c"></div></div>
         <div class="bar-val">${s.drops.length}건${adCnt?` &nbsp;<span class="badge ttl" style="font-size:10px">Ant Diff ${adCnt}</span>`:''}${wkCnt?` &nbsp;<span class="badge tp" style="font-size:10px">약전계 ${wkCnt}</span>`:''}</div>
       </div>`;
@@ -680,31 +680,39 @@ function renderStationTable(){
   const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
   const si=c=>stSortCol===c?` ${stSortDir}`:'';
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
+  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
     const stBand=(()=>{const b=BAND_MAP[String(s.dch)];return b!=null?`Band ${b}`:(s.lbnd?`Band ${s.lbnd}`:s.dch);})();
+    const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
       <td>${s.tac}</td><td>${s.pid}</td><td>${stBand}</td>
       <td>${s.cends.length}</td>
-      <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td>
+      <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
       <td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td>
       <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
-      <td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?700:400}">${s.problemRate.toFixed(1)}%</td>
       <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="11" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
   const dates=getDates();let html='';
   dates.forEach(d=>{
     const rows=byDate(d);const k=calcKPI(rows);
-    html+=`<div style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid #eee"><div class="st">${d}</div><div class="mg">${mCard('통화횟수',k.total+'건')}${mCard('Calldrop',k.drop+'건',k.dropRate+'%',parseFloat(k.dropRate)>1?'danger':'')}${mCard('MUTE',k.mute+'건',k.muteRate+'%',parseFloat(k.muteRate)>1?'danger':'')}${mCard('RLF율',k.rlfRate+'%',`LRLF ${k.lrlf} / LDCH ${k.ldch}`,parseFloat(k.rlfRate)>2?'warn':'')}${mCard('Crash',k.crsh+'건','',k.crsh>0?'danger':'')}${mCard('DAST',k.dast+'건','')}</div></div>`;
+    const dv=n=>n===0?'-':n+'건';
+    html+=`<div style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid #eee"><div class="st">${d}</div><div class="mg">
+      ${mCard('통화횟수',k.total+'건')}
+      ${mCard('Calldrop',dv(k.drop),k.drop>0?k.dropRate+'%':'',k.drop>0&&parseFloat(k.dropRate)>1?'danger':'')}
+      ${mCard('MUTE',dv(k.mute),k.mute>0?k.muteRate+'%':'',k.mute>0&&parseFloat(k.muteRate)>1?'danger':'')}
+      ${mCard('RLF율',k.lrlf>0?k.rlfRate+'%':'-',k.lrlf>0?`LRLF ${k.lrlf} / LDCH ${k.ldch}`:'',k.lrlf>0&&parseFloat(k.rlfRate)>2?'warn':'')}
+      ${mCard('Crash',dv(k.crsh),'',k.crsh>0?'danger':'')}
+      ${mCard('DAST',dv(k.dast),'','')}
+    </div></div>`;
   });
   document.getElementById('dailyContent').innerHTML=html;
 }
