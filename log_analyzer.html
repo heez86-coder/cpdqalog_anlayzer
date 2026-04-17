@@ -162,11 +162,12 @@ input[type=text]:focus,select:focus{border-color:#2980b9}
 let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
 const RP=20;let charts=[];
 const SOUND_TYPES=[
-  {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김'},
-  {key:'RNMT',label:'RxNodata Mute',color:'#2980b9',tag:'tb',desc:'수신 데이터 없음'},
-  {key:'DBMT',label:'DL BLER Mute',color:'#e67e22',tag:'ta',desc:'다운링크 BLER≥40%',bler:true},
-  {key:'UBMT',label:'UL BLER Mute',color:'#8e44ad',tag:'tp',desc:'업링크 BLER≥40%',bler:true},
+  {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김',cat:'rx'},
+  {key:'RNMT',label:'RxNodata Mute',color:'#2980b9',tag:'tb',desc:'수신 데이터 없음',cat:'rx'},
+  {key:'DBMT',label:'DL BLER Mute',color:'#e67e22',tag:'ta',desc:'다운링크 BLER≥40%',bler:true,cat:'rx'},
+  {key:'UBMT',label:'UL BLER Mute',color:'#8e44ad',tag:'tp',desc:'업링크 BLER≥40%',bler:true,cat:'tx'},
 ];
+const CAU_CODES={'0':'Unknown','1':'Max Retransmission','2':'T310 Expired','3':'SIB Read Failure','4':'RA Failure','5':'Beam Failure Recovery Failure','6':'Reconfig Failure','7':'Handover Failure','8':'RF Unavailable'};
 const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
@@ -448,7 +449,7 @@ function renderNoti(){
   const lbl={critical:'위험',warning:'주의',weak:'약전계'};
   const lc={critical:'tr',warning:'ta',weak:'tp'};
   stations.forEach(s=>{
-    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건 · 이상률 ${s.problemRate.toFixed(1)}%${s.avgRsrp!==null?' · RSRP '+s.avgRsrp+'dBm':''}${s.avgSinr!==null?' / SINR '+s.avgSinr+'dB':''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLFI ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}dBm</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}dB</span>`:''}${s.hasAntDiff?`<span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>`:''}</div></div>`;
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건 · 이상률 ${s.problemRate.toFixed(1)}%${s.avgRsrp!==null?' · RSRP '+s.avgRsrp+'dBm':''}${s.avgSinr!==null?' / SINR '+s.avgSinr+'dB':''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}dBm</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}dB</span>`:''}${s.hasAntDiff?`<span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>`:''}</div></div>`;
   });
   document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
 }
@@ -476,8 +477,19 @@ function renderMuteTab(){
     });
     return h+'</div>';
   }
-  let html=`<div class="st">전체 기간 MUTE 유형 분포</div><div class="mg">${mCard('전체 MUTE',total+'건','')}${mCard('음질 이상',soundRows.length+'건',pct(soundRows.length,total)+'%')}${mCard('마이크 이상',micRowsAll.length+'건',pct(micRowsAll.length,total)+'%',micRowsAll.length>0?'warn':'')}${unknownRows.length>0?mCard('유형 미분류',unknownRows.length+'건',''):''}</div>`;
-  html+=buildCat('음질 이상',SOUND_TYPES,soundRows,'ta');
+  const rxTypes=SOUND_TYPES.filter(t=>t.cat==='rx');
+  const txTypes=SOUND_TYPES.filter(t=>t.cat==='tx');
+  const rxRows=muteRows.filter(r=>rxTypes.some(t=>isOne(r[t.key])));
+  const txRows=muteRows.filter(r=>txTypes.some(t=>isOne(r[t.key])));
+  let html=`<div class="st">전체 기간 MUTE 유형 분포</div><div class="mg">
+    ${mCard('전체 MUTE',total+'건','')}
+    ${mCard('Rx (수화) 이상',rxRows.length+'건',pct(rxRows.length,total)+'%',rxRows.length>0?'warn':'')}
+    ${mCard('Tx (송화) 이상',txRows.length+'건',pct(txRows.length,total)+'%',txRows.length>0?'warn':'')}
+    ${mCard('마이크 이상',micRowsAll.length+'건',pct(micRowsAll.length,total)+'%',micRowsAll.length>0?'warn':'')}
+    ${unknownRows.length>0?mCard('유형 미분류',unknownRows.length+'건',''):''}
+  </div>`;
+  html+=buildCat('Rx (수화) 이상 — RSMT · RNMT · DBMT',rxTypes,rxRows,'tb');
+  html+=buildCat('Tx (송화) 이상 — UBMT',txTypes,txRows,'tp');
   html+=buildCat('마이크 이상',MIC_TYPES,micRowsAll,'tpk');
   html+=`<div class="divider"></div><div class="st">일별 MUTE 유형 현황</div>`;
   getDates().forEach(d=>{
@@ -576,7 +588,7 @@ function renderStationTable(){
   const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
   const si=c=>stSortCol===c?` ${stSortDir}`:'';
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLFI')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}<th>Ant Diff</th></tr>`;
+  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}<th>Ant Diff</th></tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
@@ -660,19 +672,24 @@ function renderRaw(){
       const tdS='style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8"';
       const rows=evts.map((e,idx)=>{
         const corrected=e._timeCorrected&&(e.Date!==r.Date||e.Time!==r.Time);
+        const cauVal=e.CAU??'';
+        const cauLabel=cauVal!==''?(CAU_CODES[String(cauVal)]||`Code ${cauVal}`):'';
+        const cauColor={'1':'#c0392b','2':'#c0392b','4':'#c0392b','5':'#c0392b','7':'#e67e22','6':'#e67e22','3':'#8e44ad','8':'#7f8c8d','0':'#aaa'}[String(cauVal)]||'#aaa';
         return`<tr>
           <td ${tdS}>${idx+1}</td>
           <td ${tdS} style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8;${corrected?'color:#2980b9;font-weight:600':''}">${e.Date}</td>
           <td ${tdS} style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8;${corrected?'color:#2980b9;font-weight:600':''}">${e.Time}${corrected?` <span style="font-size:10px;color:#888">(보정)</span>`:''}</td>
           <td ${tdS}>${e.TAC_}</td><td ${tdS}>${e.PhID}</td><td ${tdS}>${e.DLCh}</td>
-          <td ${tdS}>${e.RxP0??'-'}</td><td ${tdS}>${e.PLMN??'-'}</td>
+          <td ${tdS}>${e.RxP0??'-'}</td>
+          <td ${tdS}>${cauVal!==''?`<span style="font-weight:600;color:${cauColor}">[${cauVal}] ${cauLabel}</span>`:'-'}</td>
+          <td ${tdS}>${e.PLMN??'-'}</td>
         </tr>`;
       }).join('');
       detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}">
         <div style="padding:10px 14px;background:#f0f6ff;border-top:1px solid #c8daf5">
           <div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:6px">개별 RLF 이벤트 ${evts.length}건 (RLFI 이벤트시간: ${r.Date} ${r.Time})</div>
           <table style="border-collapse:collapse;width:auto">
-            <thead><tr><th ${thS}>No</th><th ${thS}>실제 날짜</th><th ${thS}>실제 시간</th><th ${thS}>TAC</th><th ${thS}>PCI</th><th ${thS}>DLCh</th><th ${thS}>RxP</th><th ${thS}>PLMN</th></tr></thead>
+            <thead><tr><th ${thS}>No</th><th ${thS}>실제 날짜</th><th ${thS}>실제 시간</th><th ${thS}>TAC</th><th ${thS}>PCI</th><th ${thS}>DLCh</th><th ${thS}>RxP</th><th ${thS}>원인 (CAU)</th><th ${thS}>PLMN</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div></td></tr>`;
