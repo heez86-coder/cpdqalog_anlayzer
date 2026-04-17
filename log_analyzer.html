@@ -226,6 +226,8 @@ const SOUND_TYPES=[
   {key:'UBMT',label:'UL BLER Mute',color:'#8e44ad',tag:'tp',desc:'업링크 BLER≥40%',bler:true,cat:'tx'},
 ];
 const CAU_CODES={'0':'Unknown','1':'Max Retransmission','2':'T310 Expired','3':'SIB Read Failure','4':'RA Failure','5':'Beam Failure Recovery Failure','6':'Reconfig Failure','7':'Handover Failure','8':'RF Unavailable'};
+const DROP_CAUSES={'404':'Not Found','408':'Request Timeout','415':'Unsupported Media Type','480':'Temporary Unavailable','481':'Call Transaction does not exist','484':'Address Incomplete','487':'Request Terminated','498':'Bad event','500':'Server internal error','501':'Not Implemented','503':'Service Unavailable','504':'Server Timeout','603':'Decline','605':'Does not exist anywhere','708':'TimerF timeout','709':'TimerB timeout','1101':'Call session abort','1103':'Call session timeout','1107':'End call NW Handover','1114':'Invite Timeout','1115':'IMS De-registraion','1116':'Call barred due to SSAC','1401':'RTP Timeout','1402':'RTCP Timeout','1804':'Call end by CP CRASH'};
+const PLMN_OP={'45005':'SKT','45006':'LGU+','45008':'KT','45010':'공동망'};
 const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
@@ -439,11 +441,19 @@ function buildStationMap(){
     s.weakSinr=s.avgSinr!==null&&s.avgSinr<0;
     s.isWeak=s.weakRsrp||s.weakSinr;
     s.hasAntDiff=s.antDiffDrops.length>=2;
+    s.score=s.drops.length*10+s.mutes.length*2+s.rlfis.length;
     if(s.probCount>=3&&s.problemRate>=30)s.level='critical';
     else if(s.probCount>=2||s.problemRate>=15)s.level='warning';
     else if(s.isWeak&&s.probCount>=1)s.level='weak';
     else s.level='normal';
   });
+}
+function getOperator(){
+  const cnt={};
+  allRows.forEach(r=>{const p=(r.PLMN||'').replace(/[^0-9]/g,'');if(PLMN_OP[p])cnt[p]=(cnt[p]||0)+1;});
+  allRlfEvents.forEach(e=>{const p=(e.PLMN||'').replace(/[^0-9]/g,'');if(PLMN_OP[p])cnt[p]=(cnt[p]||0)+1;});
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+  return top?PLMN_OP[top[0]]||'':'';
 }
 
 function getChipset(){
@@ -460,9 +470,10 @@ function renderHeader(filename){
   const chipset=getChipset();
   document.getElementById('logTitle').textContent=`CpGdDqaLog : ${dates[0]} ~ ${dates[dates.length-1]} (${dates.length}일치 데이터 분석)`;
   document.getElementById('logSub').textContent=`총 ${allRows.length.toLocaleString()}건 이벤트 · Feature ${[...new Set(allRows.map(r=>r.Feature))].length}종 · 기지국 ${Object.keys(stationMap).length}개 감지${antCnt>0?' · ⚠ Ant Diff 의심 '+antCnt+'개':''}${micCnt>0?' · ⚠ 마이크 이상 '+micCnt+'건':''}`;
+  const op=getOperator();
   const cl=document.getElementById('chipsetLine');
-  cl.textContent=chipset?`칩셋 : ${chipset}`:'';
-  cl.style.display=chipset?'block':'none';
+  const info=[chipset?`칩셋 : ${chipset}`:'',op?`사업자 : ${op}`:''].filter(Boolean).join(' · ');
+  cl.textContent=info;cl.style.display=info?'block':'none';
 }
 function calcKPI(rows){
   const cend=cnt('CEND',rows),drop=cnt('DROP',rows),mute=cnt('MUTE',rows),total=cend+drop;
@@ -474,18 +485,20 @@ function calcKPI(rows){
 function mCard(label,val,sub,cls){return`<div class="mc${cls?' '+cls:''}"><div class="ml">${label}</div><div class="mv">${val}</div>${sub?`<div class="ms">${sub}</div>`:''}</div>`;}
 function renderOverview(){
   const k=calcKPI(allRows);
+  const days=Math.max(getDates().length,1);
+  const davg=(n,d=1)=>`일평균 ${(n/d).toFixed(1)}건`;
   document.getElementById('callM').innerHTML=
-    mCard('총 통화횟수',k.total.toLocaleString()+'건')+
-    mCard('Calldrop',k.drop+'건',`발생률 ${k.dropRate}%`,parseFloat(k.dropRate)>1?'danger':'')+
-    mCard('MUTE 발생',k.mute+'건',`발생률 ${k.muteRate}%`,parseFloat(k.muteRate)>1?'danger':'');
+    mCard('총 통화횟수',k.total.toLocaleString()+'건',davg(k.total,days))+
+    mCard('Calldrop',k.drop+'건',`발생률 ${k.dropRate}% · ${davg(k.drop,days)}`,parseFloat(k.dropRate)>1?'danger':'')+
+    mCard('MUTE 발생',k.mute+'건',`발생률 ${k.muteRate}% · ${davg(k.mute,days)}`,parseFloat(k.muteRate)>1?'danger':'');
   document.getElementById('radioM').innerHTML=
-    mCard('RLF 발생',k.lrlf+'건',`RLF율 ${k.rlfRate}%`,parseFloat(k.rlfRate)>2?'warn':'')+
-    mCard('DAST',k.dast+'건','Data Stall')+
-    mCard('RFPD',k.rfpd+'건','Tx PD Power')+
-    mCard('MMRJ',k.mmrj+'건','MM Reject');
+    mCard('RLF 발생',k.lrlf+'건',`RLF율 ${k.rlfRate}% · ${davg(k.lrlf,days)}`,parseFloat(k.rlfRate)>2?'warn':'')+
+    mCard('DAST',k.dast+'건',davg(k.dast,days))+
+    mCard('RFPD',k.rfpd+'건',davg(k.rfpd,days))+
+    mCard('MMRJ',k.mmrj+'건',davg(k.mmrj,days));
   document.getElementById('devM').innerHTML=
-    mCard('CP Crash',k.crsh+'건','',k.crsh>0?'danger':'')+
-    mCard('SIM 탈착',k.simd+'건','');
+    mCard('CP Crash',k.crsh+'건',davg(k.crsh,days),k.crsh>0?'danger':'')+
+    mCard('SIM 탈착',k.simd+'건',davg(k.simd,days));
   renderNoti();
 }
 
@@ -503,11 +516,12 @@ function renderNoti(){
     const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
     html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
   });
-  const stations=Object.values(stationMap).filter(s=>s.level!=='normal').sort((a,b)=>{const o={critical:0,warning:1,weak:2};return(o[a.level]||9)-(o[b.level]||9)||(b.probCount-a.probCount);});
+  const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={critical:0,warning:1,weak:2};return(o[a.level]||9)-(o[b.level]||9)||(b.score-a.score);});
   const lbl={critical:'위험',warning:'주의',weak:'약전계'};
   const lc={critical:'tr',warning:'ta',weak:'tp'};
   stations.forEach(s=>{
-    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건 · 이상률 ${s.problemRate.toFixed(1)}%${s.avgRsrp!==null?' · RSRP '+s.avgRsrp+'dBm':''}${s.avgSinr!==null?' / SINR '+s.avgSinr+'dB':''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}dBm</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}dB</span>`:''}${s.hasAntDiff?`<span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>`:''}</div></div>`;
+    const rateStr=s.problemRate>0?` · 이상률 ${s.problemRate.toFixed(1)}%`:'';
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${rateStr}${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
   });
   document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
 }
@@ -581,14 +595,31 @@ function renderDropTab(){
   const weakSig=dropRows.filter(r=>getDropRSRP(r)!==null&&getDropRSRP(r)<-100);
   const lowSnr=dropRows.filter(r=>getDropSINR(r)!==null&&getDropSINR(r)<0);
   const fmtV=v=>v!==null?v.toFixed(1):'-';
+  // Cause 분석
+  const causeCnts={};
+  dropRows.forEach(r=>{const c=String(r.SIPR||'').trim();if(c)causeCnts[c]=(causeCnts[c]||0)+1;});
+  const causeList=Object.entries(causeCnts).sort((a,b)=>b[1]-a[1]);
   let html=`<div class="st">전체 DROP 요약</div><div class="mg">
     ${mCard('총 DROP',total+'건','')}
-    ${mCard('avg RSRP',fmtV(avgArr(rsrps))+'dBm','수신전력 평균',avgArr(rsrps)<-100?'warn':'')}
-    ${mCard('avg SINR',fmtV(avgArr(sinrs))+'dB','SINR 평균',avgArr(sinrs)<0?'warn':'')}
+    ${mCard('avg RSRP',fmtV(avgArr(rsrps)),'수신전력 평균',avgArr(rsrps)<-100?'warn':'')}
+    ${mCard('avg SINR',fmtV(avgArr(sinrs)),'SINR 평균',avgArr(sinrs)<0?'warn':'')}
     ${mCard('Ant Diff ≥20dB',antDiff.length+'건',pct(antDiff.length,total)+'%',antDiff.length>0?'danger':'')}
-    ${mCard('약전계 DROP',weakSig.length+'건','RxP0 < -100dBm',weakSig.length>0?'warn':'')}
-    ${mCard('저SNR DROP',lowSnr.length+'건','SNR0 < 0dB',lowSnr.length>0?'warn':'')}
+    ${mCard('약전계 DROP',weakSig.length+'건','RSRP < -100',weakSig.length>0?'warn':'')}
+    ${mCard('저SINR DROP',lowSnr.length+'건','SINR < 0',lowSnr.length>0?'warn':'')}
   </div>`;
+  if(causeList.length){
+    html+=`<div class="divider"></div><div class="st">DROP Cause 분석 (SIPR 코드)</div><div class="cat-box">`;
+    const maxC=causeList[0][1];
+    causeList.forEach(([code,n])=>{
+      const desc=DROP_CAUSES[code]||'Unknown';
+      html+=`<div class="bar-row">
+        <div class="bar-label" style="width:260px"><span style="font-weight:700;color:var(--red)">${code}</span><span style="font-size:11px;color:var(--text-secondary);margin-left:8px">${desc}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(n/maxC*100).toFixed(1)}%;background:var(--red)"></div></div>
+        <div class="bar-val">${n}건 (${pct(n,total)}%)</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
   // 기지국별 DROP 현황
   const stDrops=Object.values(stationMap).filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length);
   if(stDrops.length){
@@ -614,8 +645,8 @@ function renderDropTab(){
     const ad=dRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
     html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · DROP ${dRows.length}건</div><div class="mg">
       ${mCard('DROP',dRows.length+'건','')}
-      ${r0.length?mCard('avg RSRP',avgArr(r0).toFixed(1)+'dBm','',avgArr(r0)<-100?'warn':''):''}
-      ${s0.length?mCard('avg SINR',avgArr(s0).toFixed(1)+'dB','',avgArr(s0)<0?'warn':''):''}
+      ${r0.length?mCard('avg RSRP',avgArr(r0).toFixed(1),'',avgArr(r0)<-100?'warn':''):''}
+      ${s0.length?mCard('avg SINR',avgArr(s0).toFixed(1),'',avgArr(s0)<0?'warn':''):''}
       ${ad.length?mCard('Ant Diff',ad.length+'건','','danger'):''}
     </div></div>`;
   });
@@ -633,7 +664,7 @@ function renderStationTable(){
     return true;
   });
   if(stSortCol==='default'||!colFn[stSortCol]){
-    all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.probCount-a.probCount));
+    all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.score-a.score));
   } else {
     const fn=colFn[stSortCol];
     all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
@@ -649,14 +680,14 @@ function renderStationTable(){
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
-      <td>${s.tac}</td><td>${s.pid}</td><td>${s.dch}</td>
+      <td>${s.tac}</td><td>${s.pid}</td><td style="white-space:nowrap">${getRawBandDLCh({DLCh:s.dch})}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td>
       <td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td>
       <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
       <td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?700:400}">${s.problemRate.toFixed(1)}%</td>
-      <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp+'dBm':'-'}</td>
-      <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr+'dB':'-'}</td>
+      <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
+      <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
@@ -680,12 +711,28 @@ function renderTrend(){
     rlfCnt.push(allRlfEvents.filter(e=>e.Date===d).length);
   });
   const labels=dates.map(d=>d.slice(5));
-  document.getElementById('trendContent').innerHTML=`<div class="st">일별 발생률 추이 (%)</div><div style="position:relative;height:240px;margin-bottom:1.5rem"><canvas id="c1"></canvas></div><div class="st">일별 이벤트 카운트 (MUTE ECNT합 · DROP · RLF)</div><div style="position:relative;height:220px;margin-bottom:1.5rem"><canvas id="c3"></canvas></div><div class="st">일별 통화횟수</div><div style="position:relative;height:200px"><canvas id="c2"></canvas></div>`;
+  const chartSection=(id,title)=>`<div style="margin-bottom:1.75rem"><div style="font-size:15px;font-weight:700;color:var(--blue-800);letter-spacing:-.01em;margin-bottom:12px">${title}</div><div style="position:relative;height:240px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);padding:16px 8px 8px;box-shadow:var(--shadow-sm)"><canvas id="${id}"></canvas></div></div>`;
+  document.getElementById('trendContent').innerHTML=
+    chartSection('c1','📉 일별 발생률 추이 (%)')+
+    chartSection('c3','📊 일별 이벤트 카운트 (MUTE ECNT합 · DROP · RLF)')+
+    chartSection('c2','📞 일별 통화횟수');
+  const gridColor='rgba(100,116,139,0.1)',tickFont={size:13,family:"'Pretendard',sans-serif",weight:'600'};
+  const baseOpt={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{font:{size:13,family:"'Pretendard',sans-serif",weight:'600'},usePointStyle:true,pointStyleWidth:10,padding:16}},tooltip:{backgroundColor:'rgba(26,51,96,0.92)',titleFont:{size:13,weight:'700'},bodyFont:{size:12},padding:10,cornerRadius:8}}},scales:{x:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}},y:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}}}};
   setTimeout(()=>{
     charts.forEach(c=>c.destroy());charts=[];
-    charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[{label:'Calldrop율',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e74c3c',borderWidth:2.5},{label:'MUTE율',data:mr,borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e67e22',borderWidth:2.5},{label:'RLF율',data:rr,borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#2980b9',borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true}},scales:{x:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}},y:{ticks:{font:{size:12},callback:v=>v.toFixed(1)+'%'},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
-    charts.push(new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:[{label:'MUTE (ECNT합)',data:muteCnt,backgroundColor:'rgba(230,126,34,0.75)',borderColor:'#e67e22',borderWidth:1.5,borderRadius:4,stack:'ev'},{label:'DROP',data:dropCnt,backgroundColor:'rgba(231,76,60,0.75)',borderColor:'#e74c3c',borderWidth:1.5,borderRadius:4,stack:'ev'},{label:'RLF',data:rlfCnt,backgroundColor:'rgba(41,128,185,0.75)',borderColor:'#2980b9',borderWidth:1.5,borderRadius:4,stack:'ev'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{font:{size:12}}}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{stacked:true,ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}}},interaction:{mode:'index',intersect:false}}}));
-    charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[{label:'통화횟수',data:cc,backgroundColor:'#aed6f1',borderColor:'#2980b9',borderWidth:1.5,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+    charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[
+      {label:'Calldrop율 (%)',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.08)',tension:.35,pointRadius:5,pointHoverRadius:7,pointBackgroundColor:'#e74c3c',borderWidth:2.5,fill:true},
+      {label:'MUTE율 (%)',data:mr,borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,0.08)',tension:.35,pointRadius:5,pointHoverRadius:7,pointBackgroundColor:'#e67e22',borderWidth:2.5,fill:true},
+      {label:'RLF율 (%)',data:rr,borderColor:'#2a5aaf',backgroundColor:'rgba(42,90,175,0.07)',tension:.35,pointRadius:5,pointHoverRadius:7,pointBackgroundColor:'#2a5aaf',borderWidth:2.5,fill:true}
+    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,ticks:{...baseOpt.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}}}));
+    charts.push(new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:[
+      {label:'MUTE (ECNT합)',data:muteCnt,backgroundColor:'rgba(230,126,34,0.8)',borderColor:'#e67e22',borderWidth:0,borderRadius:5,borderSkipped:false,stack:'ev'},
+      {label:'DROP',data:dropCnt,backgroundColor:'rgba(231,76,60,0.82)',borderColor:'#e74c3c',borderWidth:0,borderRadius:5,borderSkipped:false,stack:'ev'},
+      {label:'RLF',data:rlfCnt,backgroundColor:'rgba(42,90,175,0.82)',borderColor:'#2a5aaf',borderWidth:0,borderRadius:5,borderSkipped:false,stack:'ev'}
+    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,stacked:true}}}}));
+    charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[
+      {label:'통화횟수',data:cc,backgroundColor:'rgba(42,90,175,0.18)',borderColor:'#2a5aaf',borderWidth:2,borderRadius:6,borderSkipped:false}
+    ]},options:{...baseOpt,plugins:{...baseOpt.plugins,legend:{display:false}}}}));
   },100);
 }
 
@@ -715,9 +762,9 @@ function getRawRSRP(r){
 function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}return r.CINR??'';}
 function getRawCause(r){
   const f=r.Feature;
-  if(f==='RLF'){const v=r.CAU??'';return v!==''?(CAU_CODES[String(v)]||`Code ${v}`):''}
-  if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>CAU_CODES[String(v)]||`Code ${v}`).join(' / ');}
-  if(f==='DROP')return r.SIPR??'';
+  if(f==='RLF'){const v=r.CAU??'';return v!==''?`${v} : ${CAU_CODES[String(v)]||'Unknown'}`:''}
+  if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>`${v} : ${CAU_CODES[String(v)]||'Unknown'}`).join(' / ');}
+  if(f==='DROP'){const c=String(r.SIPR||'').trim();return c?`${c} : ${DROP_CAUSES[c]||'Unknown'}`:''}
   if(f==='REGI')return r.FRSN??'';
   if(f==='PDPF'||f==='PDPI')return r.ENDR??'';
   if(f==='ATTF'||f==='ATTI')return r.EMMC??r.ESMC??'';
@@ -735,14 +782,14 @@ function buildRawRows(){
   });
   return rows;
 }
-const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':8,'3050':8,'3200':8,'3743':8};
+const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
 function getRawBandDLCh(r){
   if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?`Band ${b}`:''}
   const dch=r.DLCh??'';if(!dch)return'';
   const band=BAND_MAP[String(dch)];
   return band!=null?`Band ${band} (${dch})`:String(dch);
 }
-const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','Band(DLCh)','RSRP','SINR','Cause'];
+const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC_','PhID','Band(DLCh)','RSRP','SINR','Cause'];
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -759,6 +806,8 @@ function renderRaw(){
     const mainRow='<tr>'+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
+      if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return`<td style="white-space:nowrap">${raw?raw+(op?` (${op})`:''):''}</td>`;}
+      if(c==='ACT')return`<td>${r.ACT??''}</td>`;
       if(c==='Band(DLCh)')return`<td style="white-space:nowrap">${getRawBandDLCh(r)}</td>`;
       if(c==='RSRP')return`<td>${getRawRSRP(r)}</td>`;
       if(c==='SINR')return`<td>${getRawSINR(r)}</td>`;
