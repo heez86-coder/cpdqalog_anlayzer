@@ -190,10 +190,12 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
     </div>
     <div id="tab-station" style="display:none">
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <input type="text" id="stSearch" placeholder="TAC / PCI / 채널 검색..." oninput="renderStationTable()" style="flex:1;min-width:140px">
+        <input type="text" id="stTac" placeholder="TAC" oninput="renderStationTable()" style="width:90px">
+        <input type="text" id="stPci" placeholder="PCI" oninput="renderStationTable()" style="width:90px">
+        <input type="text" id="stBand" placeholder="Band" oninput="renderStationTable()" style="width:90px">
         <select id="stFilter" onchange="renderStationTable()">
-          <option value="">전체</option><option value="critical">위험</option>
-          <option value="warning">주의</option><option value="weak">약전계</option>
+          <option value="">전체</option><option value="critical">불량</option>
+          <option value="warning">주의</option><option value="weak">양호</option>
           <option value="antdiff">Ant Diff</option><option value="normal">정상</option>
         </select>
       </div>
@@ -205,11 +207,11 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
     <div id="tab-daily" style="display:none"><div id="dailyContent"></div></div>
     <div id="tab-trend" style="display:none"><div id="trendContent"></div></div>
     <div id="tab-raw" style="display:none">
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         <input type="text" id="rawSearch" placeholder="검색..." oninput="filterRaw()" style="flex:1;min-width:140px">
-        <select id="rawFeat" onchange="filterRaw()"><option value="">모든 Feature</option></select>
         <button class="btn" onclick="exportCSV()">CSV 내보내기</button>
       </div>
+      <div id="rawFeatChk" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:var(--blue-50);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px"></div>
       <div class="tw"><table><thead id="rawHead"></thead><tbody id="rawBody"></tbody></table></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:#888" id="rawPager"></div>
     </div>
@@ -229,8 +231,10 @@ const SOUND_TYPES=[
 const CAU_CODES={'0':'Unknown','1':'Max Retransmission','2':'T310 Expired','3':'SIB Read Failure','4':'RA Failure','5':'Beam Failure Recovery Failure','6':'Reconfig Failure','7':'Handover Failure','8':'RF Unavailable'};
 const DROP_CAUSES={'404':'Not Found','408':'Request Timeout','415':'Unsupported Media Type','480':'Temporary Unavailable','481':'Call Transaction does not exist','484':'Address Incomplete','487':'Request Terminated','498':'Bad event','500':'Server internal error','501':'Not Implemented','503':'Service Unavailable','504':'Server Timeout','603':'Decline','605':'Does not exist anywhere','708':'TimerF timeout','709':'TimerB timeout','1101':'Call session abort','1103':'Call session timeout','1107':'End call NW Handover','1114':'Invite Timeout','1115':'IMS De-registraion','1116':'Call barred due to SSAC','1401':'RTP Timeout','1402':'RTCP Timeout','1804':'Call end by CP CRASH'};
 const PLMN_OP={'45005':'SKT','45006':'LGU+','45008':'KT','45010':'공동망'};
-const SCGF_FTYP={'0':'T310 Expiry','1':'randomAccessProblem','2':'RLC MaxNumRetx','3':'SCG_ChangeFailure','4':'SCG_ReconfigFailure','5':'SRB3-IntergrityFailure','6':'BeamRecoveryFailure','B':'Battery','H':'Heat(High Temperature)','L':'Low TP'};
-const REGI_CAUSES={'200':'OK','201':'OK_AFTER_FAIL','403':'IMS Regi Fail','708':'TIMEOUT','1009':'EMPTY_PCSCF','1010':'REGI_THROTTLED','1014':'GVN_NOT_READY','1018':'TRY_RCS_CONFIG','1019':'DM_TRIGGERED','1204':'NO_MMTEL_USER_SETTINGS_OFF (사용자 HD Voice OFF)','1210':'NO_MMTEL_3G_PREFFERED_MODE (3G 우선모드 설정)','3002':'PDN_DISCONNECTED','3012':'DEFAULT NW CHANGED (WIFI - LTE 전환 예상)','3023':'FLIGHT MODE ON','3024':'RIL_INVOKE','3041':'TEMPORARY FAILURE'};
+const SCGF_FTYP={'0':'T310 Expiry','1':'randomAccessProblem','2':'RLC MaxNumRetx','3':'SCG_ChangeFailure','4':'SCG_ReconfigFailure','5':'SRB3-IntergrityFailure','6':'BeamRecoveryFailure','B':'Battery','H':'Heat(High Temperature)','L':'Low TP','b':'Battery','h':'Heat(High Temperature)','l':'Low TP'};
+const REGI_CAUSES={'200':'OK','201':'OK_AFTER_FAIL','403':'IMS Regi Fail','708':'TIMEOUT','1009':'EMPTY_PCSCF','1010':'REGI_THROTTLED','1014':'GVN_NOT_READY','1018':'TRY_RCS_CONFIG','1019':'DM_TRIGGERED','1204':'NO_MMTEL_USER_SETTINGS_OFF (사용자 HD Voice OFF)','1210':'NO_MMTEL_3G_PREFFERED_MODE (3G 우선모드 설정)','3002':'PDN_DISCONNECTED','3012':'DEFAULT NW CHANGED (WIFI - LTE 전환 예상)','3023':'FLIGHT MODE ON','3024':'RIL_INVOKE','3031':'NETWORK MODE CHANGED','3033':'OUT OF BATTERY','3041':'TEMPORARY FAILURE'};
+const ATTF_CAUSES={'11':'PLMN NOT ALLOWED','19':'ESM_FAILURE'};
+const MMRJ_CAUSES={'1':'AUTHENTICATION REJECT','2':'IMSI Unknown in HSS','3':'ILLEGAL UE/MS','6':'ILLEGAL ME','8':'EPS Services and non-EPS Services not allowed'};
 const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
@@ -372,7 +376,12 @@ function pct(n,d){return d===0?'0.0':((n/d)*100).toFixed(1);}
 function fNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
 function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;}
 function isOne(v){return v==='1'||v===1;}
-function getCellKey(tac,pid,dch){if(!tac&&!pid&&!dch)return null;return`${tac||'?'}|${pid||'?'}|${dch||'?'}`;}
+function getCellKey(tac,pid,dch,lbnd){
+  if(!tac&&!pid&&!dch&&!lbnd)return null;
+  const b=BAND_MAP[String(dch||'')];
+  const keyBand=b!=null?String(b):(lbnd||dch||'?');
+  return`${tac||'?'}|${pid||'?'}|${keyBand}`;
+}
 
 function buildRlfEvents(){
   allRlfEvents=[];rlfByRlfi={};
@@ -405,11 +414,12 @@ function buildRlfEvents(){
 }
 function buildStationMap(){
   stationMap={};
-  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',drops:[],mutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],rlfiRsrp:[],antDiffDrops:[]};};
+  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',band:'',drops:[],mutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],rlfiRsrp:[],antDiffDrops:[]};};
   allRows.forEach(r=>{
     const f=r.Feature;
     if(['CEND','DROP','MUTE'].includes(f)){
-      const key=getCellKey(r.TAC_,r.PhID,r.DLCh);if(!key)return;
+      const key=f==='MUTE'?getCellKey(r.TAC_,r.PhID,r.DLCh,r.LBND):getCellKey(r.TAC_,r.PhID,r.DLCh);
+      if(!key)return;
       ensure(key);const s=stationMap[key];
       s.tac=r.TAC_||s.tac;s.pid=r.PhID||s.pid;s.dch=r.DLCh||s.dch;
       if(f==='CEND')s.cends.push(r);
@@ -437,6 +447,7 @@ function buildStationMap(){
     const rxp=fNum(e.RxP0);if(rxp!==null)s.rlfiRsrp.push(rxp);
   });
   Object.values(stationMap).forEach(s=>{
+    const bNum=BAND_MAP[String(s.dch)];s.band=bNum!=null?String(bNum):(s.lbnd||s.dch||'');
     const totalRef=s.cends.length+s.drops.length;
     s.probCount=s.drops.length+s.mutes.length+s.rlfis.length;
     s.problemRate=totalRef>0?((s.drops.length+s.mutes.length)/totalRef*100):0;
@@ -475,20 +486,32 @@ function renderHeader(filename){
   const antCnt=Object.values(stationMap).filter(s=>s.hasAntDiff).length;
   const micCnt=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>isOne(r[t.key]))).length;
   const chipset=getChipset();
-  document.getElementById('logTitle').textContent=`CpGdDqaLog : ${dates[0]} ~ ${dates[dates.length-1]} (${dates.length}일치 데이터 분석)`;
-  document.getElementById('logSub').textContent=`총 ${allRows.length.toLocaleString()}건 이벤트 · Feature ${[...new Set(allRows.map(r=>r.Feature))].length}종 · 기지국 ${Object.keys(stationMap).length}개 감지${antCnt>0?' · ⚠ Ant Diff 의심 '+antCnt+'개':''}${micCnt>0?' · ⚠ 마이크 이상 '+micCnt+'건':''}`;
+  const d0=dates[0].replace(/-/g,'/'),d1=dates[dates.length-1].replace(/-/g,'/');
   const op=getOperator();
+  document.getElementById('logTitle').textContent='CpGdDqa.LOG Analyzer';
+  document.getElementById('logSub').textContent=`${d0} ~ ${d1} (${dates.length}일치 데이터)`;
   const cl=document.getElementById('chipsetLine');
-  const info=[chipset?`칩셋 : ${chipset}`:'',op?`사업자 : ${op}`:''].filter(Boolean).join(' · ');
-  cl.textContent=info;cl.style.display=info?'block':'none';
+  const featCnt=[...new Set(allRows.map(r=>r.Feature))].length;
+  const stCnt=Object.keys(stationMap).length;
+  const lines=[`총 ${allRows.length.toLocaleString()}건 이벤트 · Feature ${featCnt}종 · 기지국 ${stCnt}개 감지`];
+  if(chipset)lines.push(`칩셋 : ${chipset}`);
+  if(op)lines.push(`사업자 : ${op}`);
+  cl.innerHTML=lines.join('<br>');cl.style.display='block';
 }
 function calcKPI(rows){
   const cend=cnt('CEND',rows),drop=cnt('DROP',rows),mute=cnt('MUTE',rows),total=cend+drop;
   const rlfcRows=byFeat('RLFC',rows);
   let lrlf=0,ldch=0;rlfcRows.forEach(r=>{lrlf+=parseFloat(r.LRLF||0);ldch+=parseFloat(r.LDCH||0);});
+  const nsvcRows=byFeat('NSVC',rows);
+  const nsvc=nsvcRows.reduce((s,r)=>s+(parseInt(r.CNT_||0,10)||0),0);
+  const simdRows=byFeat('SIMD',rows);
+  const nos1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.NOS1||0,10)||0)):0;
+  const rcr1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.RCR1||0,10)||0)):0;
+  const sim1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.SIM1||0,10)||0)):0;
   return{cend,drop,mute,total,dropRate:pct(drop,total),muteRate:pct(mute,cend),lrlf,ldch,rlfRate:pct(lrlf,ldch),
     crsh:cnt('CRSH',rows),simd:cnt('SIMD',rows),dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows),
-    scgf:cnt('SCGF',rows),attf:cnt('ATTF',rows),atti:cnt('ATTI',rows),pdpf:cnt('PDPF',rows),pdpi:cnt('PDPI',rows),mipi:cnt('MIPI',rows)};
+    scgf:cnt('SCGF',rows),attf:cnt('ATTF',rows),atti:cnt('ATTI',rows),pdpf:cnt('PDPF',rows),pdpi:cnt('PDPI',rows),mipi:cnt('MIPI',rows),
+    nsvc,nos1,rcr1,sim1};
 }
 function mCard(label,val,sub,cls){return`<div class="mc${cls?' '+cls:''}"><div class="ml">${label}</div><div class="mv">${val}</div>${sub?`<div class="ms">${sub}</div>`:''}</div>`;}
 function renderOverview(){
@@ -502,6 +525,7 @@ function renderOverview(){
   document.getElementById('radioM').innerHTML=
     mCard('RLF 발생',k.lrlf+'건',`RLF율 ${k.rlfRate}% · ${davg(k.lrlf,days)}`,parseFloat(k.rlfRate)>2?'warn':'')+
     mCard('SCGF 발생',k.scgf+'건',davg(k.scgf,days),k.scgf>0?'warn':'')+
+    mCard('NoSVC',k.nsvc+'건',davg(k.nsvc,days),k.nsvc>0?'warn':'')+
     mCard('DAST',k.dast+'건',davg(k.dast,days));
   document.getElementById('regiM').innerHTML=
     mCard('ATTF',k.attf+'건',davg(k.attf,days),k.attf>0?'warn':'')+
@@ -509,9 +533,10 @@ function renderOverview(){
     mCard('PDPF',k.pdpf+'건',davg(k.pdpf,days),k.pdpf>0?'warn':'')+
     mCard('PDPI',k.pdpi+'건',davg(k.pdpi,days),k.pdpi>0?'warn':'')+
     mCard('MMRJ',k.mmrj+'건',davg(k.mmrj,days),k.mmrj>0?'warn':'');
+  const simSub=[k.nos1>0?`No SIM: ${k.nos1}회`:'',k.rcr1>0?`Recovery ${k.rcr1}회`:'',k.sim1>0?`Insert/Remove ${k.sim1}건`:''].filter(Boolean).join(' · ');
   document.getElementById('devM').innerHTML=
     mCard('CP Crash',k.crsh+'건',davg(k.crsh,days),k.crsh>0?'danger':'')+
-    mCard('SIM 탈착',k.simd+'건',davg(k.simd,days))+
+    mCard('SIM 관련',k.simd+'건',simSub||davg(k.simd,days))+
     mCard('RFPD',k.rfpd+'건',davg(k.rfpd,days))+
     mCard('MIPI',k.mipi+'건',davg(k.mipi,days));
   renderNoti();
@@ -529,14 +554,14 @@ function renderNoti(){
   const antDiffSt=Object.values(stationMap).filter(s=>s.hasAntDiff).sort((a,b)=>b.antDiffDrops.length-a.antDiffDrops.length);
   antDiffSt.forEach(s=>{
     const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
-    html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
+    html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
   });
   const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={critical:0,warning:1,weak:2};return(o[a.level]||9)-(o[b.level]||9)||(b.score-a.score);});
   const lbl={critical:'위험',warning:'주의',weak:'약전계'};
   const lc={critical:'tr',warning:'ta',weak:'tp'};
   stations.forEach(s=>{
     const rateStr=s.problemRate>0?` · 이상률 ${s.problemRate.toFixed(1)}%`:'';
-    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${rateStr}${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${rateStr}${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
   });
   document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
 }
@@ -647,7 +672,7 @@ function renderDropTab(){
       const adCnt=s.antDiffDrops.length;
       const wkCnt=s.drops.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100).length;
       html+=`<div class="bar-row">
-        <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid} / CH ${s.dch}</div>
+        <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/maxD*100).toFixed(1)}%;background:#e74c3c"></div></div>
         <div class="bar-val">${s.drops.length}건${adCnt?` &nbsp;<span class="badge ttl" style="font-size:10px">Ant Diff ${adCnt}</span>`:''}${wkCnt?` &nbsp;<span class="badge tp" style="font-size:10px">약전계 ${wkCnt}</span>`:''}</div>
       </div>`;
@@ -677,14 +702,18 @@ function renderDropTab(){
   document.getElementById('dropContent').innerHTML=html;
 }
 function renderStationTable(){
-  const q=(document.getElementById('stSearch').value||'').toLowerCase();
+  const qTac=(document.getElementById('stTac').value||'').toLowerCase();
+  const qPci=(document.getElementById('stPci').value||'').toLowerCase();
+  const qBand=(document.getElementById('stBand').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
   const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999};
   const lvO={critical:0,warning:1,weak:2,normal:3};
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
     if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
-    if(q&&!`${s.tac}${s.pid}${s.dch}`.toLowerCase().includes(q))return false;
+    if(qTac&&!String(s.tac).toLowerCase().includes(qTac))return false;
+    if(qPci&&!String(s.pid).toLowerCase().includes(qPci))return false;
+    if(qBand&&!String(s.band||s.dch).toLowerCase().includes(qBand))return false;
     return true;
   });
   if(stSortCol==='default'||!colFn[stSortCol]){
@@ -693,26 +722,26 @@ function renderStationTable(){
     const fn=colFn[stSortCol];
     all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
   }
-  const lbl={critical:'위험',warning:'주의',weak:'약전계',normal:'정상'};
-  const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
-  const si=c=>stSortCol===c?` ${stSortDir}`:'';
+  const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
+  const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
   document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
-    const stBand=(()=>{const b=BAND_MAP[String(s.dch)];return b!=null?`Band ${b}`:(s.lbnd?`Band ${s.lbnd}`:s.dch);})();
     const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
+    const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
+    const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
-      <td>${s.tac}</td><td>${s.pid}</td><td>${stBand}</td>
+      <td>${s.tac}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
       <td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td>
       <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
-      <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
-      <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
+      <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
+      <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="11" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
@@ -772,14 +801,16 @@ function renderTrend(){
 function initRaw(){
   const rawRows=buildRawRows();
   const feats=[...new Set(rawRows.map(r=>r.Feature))].sort();
-  document.getElementById('rawFeat').innerHTML='<option value="">모든 Feature</option>'+feats.map(f=>`<option value="${f}">${f}</option>`).join('');
+  const fc=document.getElementById('rawFeatChk');
+  fc.innerHTML=`<span style="font-weight:700;color:var(--text-secondary);margin-right:4px;line-height:2">표시:</span>`+
+    feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('');
   rawFiltered=[...rawRows];rawPage=1;renderRaw();
 }
 function filterRaw(){
   const q=document.getElementById('rawSearch').value.toLowerCase();
-  const feat=document.getElementById('rawFeat').value;
+  const checked=[...document.querySelectorAll('.feat-chk:checked')].map(c=>c.value);
   rawFiltered=buildRawRows().filter(r=>{
-    if(feat&&r.Feature!==feat)return false;
+    if(!checked.includes(r.Feature))return false;
     if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
     return true;
   });rawPage=1;rawOpenIdx=new Set();renderRaw();
@@ -803,7 +834,8 @@ function getRawCause(r){
   if(f==='PSCI')return r.FLCD??'';
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'||f==='PDPI')return r.ENDR??'';
-  if(f==='ATTF'||f==='ATTI')return r.EMMC??r.ESMC??'';
+  if(f==='ATTF'||f==='ATTI'){const v=String(r.EMMC??r.ESMC??'').trim();return v?`${v} : ${ATTF_CAUSES[v]||''}`:'';}
+  if(f==='MMRJ'){const v=String(r.RJCU??'').trim();return v?`${v} : ${MMRJ_CAUSES[v]||'Unknown'}`:''}
   return'';
 }
 function buildRawRows(){
@@ -820,7 +852,7 @@ function buildRawRows(){
 }
 const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
 function getRawBandDLCh(r){
-  if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?`Band ${b}`:''}
+  if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?String(b):''}
   if(r.Feature==='SCGF'){
     const lte=r.MBnd??r.LBnd??'';const nr=r.SBnd??r.NBnd??'';
     const parts=[];if(lte)parts.push(`${lte}(LTE)`);if(nr)parts.push(`${nr}(NR)`);
@@ -828,10 +860,25 @@ function getRawBandDLCh(r){
   }
   const dch=r.DLCh??'';if(!dch)return'';
   const band=BAND_MAP[String(dch)];
-  return band!=null?`Band ${band} (${dch})`:String(dch);
+  return band!=null?`${band} (${dch})`:String(dch);
 }
-const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','Cause'];
-const RAW_COL_W={'Date':88,'Time':68,'Feature':58,'PLMN':100,'ACT':62,'TAC(HEX)':72,'TAC(DEC)':72,'PhID':52,'Band(DLCh)':108,'RSRP':58,'SINR':52,'Cause':190};
+function getRawNote(r){
+  const f=r.Feature;
+  const PATH_MAP={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
+  const notes=[];
+  if(f==='MUTE'){const p=String(r.PATH??'').trim();if(PATH_MAP[p])notes.push(PATH_MAP[p]);}
+  if(f==='CEND'||f==='DROP'){
+    const a=String(r.AUST??'').trim();if(PATH_MAP[a])notes.push(PATH_MAP[a]);
+    const ct=String(r.Ctyp??'').trim();if(ct==='5')notes.push('Video call');else if(ct==='6')notes.push('Emergency call');
+  }
+  if(f==='MIPI'){const mid=r.MID_??'',pid=r.PID_??'';if(mid||pid)notes.push(`MID : ${mid}, PID : ${pid} 확인필요`);}
+  if(f==='RFPD'){const msg=r.MSG_??'';if(msg)notes.push(String(msg));}
+  if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
+  if(String(r.ACT_??'').trim()==='2')notes.push('3G확인필요');
+  return notes.join(' · ');
+}
+const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','Cause','참고'];
+const RAW_COL_W={'Date':88,'Time':68,'Feature':58,'PLMN':100,'ACT':62,'TAC(HEX)':72,'TAC(DEC)':72,'PhID':52,'Band(DLCh)':90,'RSRP':58,'SINR':52,'Cause':170,'참고':120};
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -857,6 +904,7 @@ function renderRaw(){
       if(c==='RSRP')return`<td>${getRawRSRP(r)}</td>`;
       if(c==='SINR')return`<td>${getRawSINR(r)}</td>`;
       if(c==='Cause'){const cv=getRawCause(r);return`<td style="font-size:11px;color:var(--text-secondary);white-space:normal;line-height:1.4">${cv}</td>`;}
+      if(c==='참고'){const nv=getRawNote(r);return`<td style="font-size:11px;color:var(--teal);white-space:normal;line-height:1.4">${nv}</td>`;}
       return`<td>${v}</td>`;
     }).join('')+`<td><button class="det-btn" onclick="toggleDetail(${gi})" title="세부 정보">${isOpen?'▲':'▼'}</button></td></tr>`;
     if(!isOpen)return mainRow;
