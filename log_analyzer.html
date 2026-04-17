@@ -717,7 +717,7 @@ function renderTrend(){
     chartSection('c3','📊 일별 이벤트 카운트 (MUTE ECNT합 · DROP · RLF)')+
     chartSection('c2','📞 일별 통화횟수');
   const gridColor='rgba(100,116,139,0.1)',tickFont={size:13,family:"'Pretendard',sans-serif",weight:'600'};
-  const baseOpt={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{font:{size:13,family:"'Pretendard',sans-serif",weight:'600'},usePointStyle:true,pointStyleWidth:10,padding:16}},tooltip:{backgroundColor:'rgba(26,51,96,0.92)',titleFont:{size:13,weight:'700'},bodyFont:{size:12},padding:10,cornerRadius:8}}},scales:{x:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}},y:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}}}};
+  const baseOpt={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{font:{size:13,family:"'Pretendard',sans-serif",weight:'600'},usePointStyle:true,pointStyleWidth:10,padding:16}},tooltip:{backgroundColor:'rgba(26,51,96,0.92)',titleFont:{size:13,weight:'700'},bodyFont:{size:12},padding:10,cornerRadius:8}},scales:{x:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}},y:{ticks:{font:tickFont,color:'#64748b'},grid:{color:gridColor,drawBorder:false}}}};
   setTimeout(()=>{
     charts.forEach(c=>c.destroy());charts=[];
     charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[
