@@ -642,13 +642,13 @@ function renderStationTable(){
   const lc={critical:'tr',warning:'ta',weak:'tp',normal:'tgr'};
   const si=c=>stSortCol===c?` ${stSortDir}`:'';
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}<th>Ant Diff</th></tr>`;
+  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>채널</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('prob','이상률')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
-      <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span>${s.hasAntDiff?` <span class="badge ttl">ANT</span>`:''}</td>
+      <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
       <td>${s.tac}</td><td>${s.pid}</td><td>${s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${s.drops.length}</td>
@@ -657,9 +657,8 @@ function renderStationTable(){
       <td style="color:${s.problemRate>=15?'#c0392b':'inherit'};font-weight:${s.problemRate>=15?700:400}">${s.problemRate.toFixed(1)}%</td>
       <td style="color:${s.weakRsrp?'#6c3483':'inherit'}">${s.avgRsrp!==null?s.avgRsrp+'dBm':'-'}</td>
       <td style="color:${s.weakSinr?'#6c3483':'inherit'}">${s.avgSinr!==null?s.avgSinr+'dB':'-'}</td>
-      <td style="color:${s.hasAntDiff?'#0e6655':'inherit'};font-weight:${s.hasAntDiff?700:400}">${s.antDiffDrops.length>0?s.antDiffDrops.length+'건 (최대 '+Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(0)+'dB)':'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="13" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
@@ -691,14 +690,15 @@ function renderTrend(){
 }
 
 function initRaw(){
-  const feats=[...new Set(allRows.map(r=>r.Feature))].sort();
+  const rawRows=buildRawRows();
+  const feats=[...new Set(rawRows.map(r=>r.Feature))].sort();
   document.getElementById('rawFeat').innerHTML='<option value="">모든 Feature</option>'+feats.map(f=>`<option value="${f}">${f}</option>`).join('');
-  rawFiltered=[...allRows];rawPage=1;renderRaw();
+  rawFiltered=[...rawRows];rawPage=1;renderRaw();
 }
 function filterRaw(){
   const q=document.getElementById('rawSearch').value.toLowerCase();
   const feat=document.getElementById('rawFeat').value;
-  rawFiltered=allRows.filter(r=>{
+  rawFiltered=buildRawRows().filter(r=>{
     if(feat&&r.Feature!==feat)return false;
     if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
     return true;
@@ -707,10 +707,15 @@ function filterRaw(){
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
 function getDropRSRP(r){const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null?(a+b)/2:a;}
 function getDropSINR(r){const a=fNum(r.SNR0),b=fNum(r.SNR1);return a!==null&&b!==null?(a+b)/2:a;}
-function getRawRSRP(r){if(r.Feature==='DROP'){const v=getDropRSRP(r);return v!==null?v.toFixed(1):'';}return r.RSRP??'';}
+function getRawRSRP(r){
+  if(r.Feature==='DROP'){const v=getDropRSRP(r);return v!==null?v.toFixed(1):'';}
+  if(r.Feature==='RLF')return r.RxP0??'';
+  return r.RSRP??'';
+}
 function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}return r.CINR??'';}
 function getRawCause(r){
   const f=r.Feature;
+  if(f==='RLF'){const v=r.CAU??'';return v!==''?(CAU_CODES[String(v)]||`Code ${v}`):''}
   if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>CAU_CODES[String(v)]||`Code ${v}`).join(' / ');}
   if(f==='DROP')return r.SIPR??'';
   if(f==='REGI')return r.FRSN??'';
@@ -718,7 +723,26 @@ function getRawCause(r){
   if(f==='ATTF'||f==='ATTI')return r.EMMC??r.ESMC??'';
   return'';
 }
-const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','DLCh','RSRP','SINR','Cause'];
+function buildRawRows(){
+  const rows=[];
+  allRows.forEach(r=>{
+    if(r.Feature==='RLFI'){
+      const key=`${r.Date}|${r.Time}`;
+      (rlfByRlfi[key]||[]).forEach(e=>rows.push(e));
+    } else {
+      rows.push(r);
+    }
+  });
+  return rows;
+}
+const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':8,'3050':8,'3200':8,'3743':8};
+function getRawBandDLCh(r){
+  if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?`Band ${b}`:''}
+  const dch=r.DLCh??'';if(!dch)return'';
+  const band=BAND_MAP[String(dch)];
+  return band!=null?`Band ${band} (${dch})`:String(dch);
+}
+const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','Band(DLCh)','RSRP','SINR','Cause'];
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -735,6 +759,7 @@ function renderRaw(){
     const mainRow='<tr>'+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
+      if(c==='Band(DLCh)')return`<td style="white-space:nowrap">${getRawBandDLCh(r)}</td>`;
       if(c==='RSRP')return`<td>${getRawRSRP(r)}</td>`;
       if(c==='SINR')return`<td>${getRawSINR(r)}</td>`;
       if(c==='Cause'){const cv=getRawCause(r);return`<td style="font-size:11px;color:var(--text-secondary);max-width:200px;white-space:normal;line-height:1.4">${cv}</td>`;}
@@ -771,7 +796,7 @@ function renderRaw(){
           </table>
         </div></td></tr>`;
     } else {
-      const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
+      const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&!k.startsWith('_')&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
       detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
     }
     return mainRow+detailRow;
@@ -780,7 +805,7 @@ function renderRaw(){
   let btns='';
   for(let p=Math.max(1,rawPage-2);p<=Math.min(total,rawPage+2);p++)
     btns+=`<button class="btn${p===rawPage?' btn-p':''}" style="padding:5px 11px;font-size:12px;margin:0 2px" onclick="rawGo(${p})">${p}</button>`;
-  document.getElementById('rawPager').innerHTML=`<span>${rawFiltered.length}건 / 전체 ${allRows.length}건</span><div>${btns}</div>`;
+  document.getElementById('rawPager').innerHTML=`<span>${rawFiltered.length}건 / 전체 ${buildRawRows().length}건</span><div>${btns}</div>`;
 }
 function rawGo(p){rawPage=p;renderRaw();}
 function exportCSV(){
