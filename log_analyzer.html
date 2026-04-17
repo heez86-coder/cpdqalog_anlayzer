@@ -183,6 +183,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
     <div id="tab-overview">
       <div class="st">통화 품질</div><div class="mg" id="callM"></div>
       <div class="st">무선 품질</div><div class="mg" id="radioM"></div>
+      <div class="st">망등록 이슈</div><div class="mg" id="regiM"></div>
       <div class="st">단말 / 기타</div><div class="mg" id="devM"></div>
       <div class="divider"></div>
       <div class="st">이상 감지 알림</div><div id="notiArea"></div>
@@ -234,6 +235,9 @@ const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
   {key:'MCST',label:'MIC 입력신호 이상',color:'#922b21',tag:'tr',desc:'HW 이상 의심'},
+];
+const USER_TYPES=[
+  {key:'TXSF',label:'송화음 차단',color:'#16a085',tag:'ttl',desc:'사용자 의도적 송화 차단'},
 ];
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
@@ -483,7 +487,8 @@ function calcKPI(rows){
   const rlfcRows=byFeat('RLFC',rows);
   let lrlf=0,ldch=0;rlfcRows.forEach(r=>{lrlf+=parseFloat(r.LRLF||0);ldch+=parseFloat(r.LDCH||0);});
   return{cend,drop,mute,total,dropRate:pct(drop,total),muteRate:pct(mute,cend),lrlf,ldch,rlfRate:pct(lrlf,ldch),
-    crsh:cnt('CRSH',rows),simd:cnt('SIMD',rows),dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows)};
+    crsh:cnt('CRSH',rows),simd:cnt('SIMD',rows),dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows),
+    scgf:cnt('SCGF',rows),attf:cnt('ATTF',rows),atti:cnt('ATTI',rows),pdpf:cnt('PDPF',rows),pdpi:cnt('PDPI',rows),mipi:cnt('MIPI',rows)};
 }
 function mCard(label,val,sub,cls){return`<div class="mc${cls?' '+cls:''}"><div class="ml">${label}</div><div class="mv">${val}</div>${sub?`<div class="ms">${sub}</div>`:''}</div>`;}
 function renderOverview(){
@@ -496,12 +501,19 @@ function renderOverview(){
     mCard('MUTE 발생',k.mute+'건',`발생률 ${k.muteRate}% · ${davg(k.mute,days)}`,parseFloat(k.muteRate)>1?'danger':'');
   document.getElementById('radioM').innerHTML=
     mCard('RLF 발생',k.lrlf+'건',`RLF율 ${k.rlfRate}% · ${davg(k.lrlf,days)}`,parseFloat(k.rlfRate)>2?'warn':'')+
-    mCard('DAST',k.dast+'건',davg(k.dast,days))+
-    mCard('RFPD',k.rfpd+'건',davg(k.rfpd,days))+
-    mCard('MMRJ',k.mmrj+'건',davg(k.mmrj,days));
+    mCard('SCGF 발생',k.scgf+'건',davg(k.scgf,days),k.scgf>0?'warn':'')+
+    mCard('DAST',k.dast+'건',davg(k.dast,days));
+  document.getElementById('regiM').innerHTML=
+    mCard('ATTF',k.attf+'건',davg(k.attf,days),k.attf>0?'warn':'')+
+    mCard('ATTI',k.atti+'건',davg(k.atti,days),k.atti>0?'warn':'')+
+    mCard('PDPF',k.pdpf+'건',davg(k.pdpf,days),k.pdpf>0?'warn':'')+
+    mCard('PDPI',k.pdpi+'건',davg(k.pdpi,days),k.pdpi>0?'warn':'')+
+    mCard('MMRJ',k.mmrj+'건',davg(k.mmrj,days),k.mmrj>0?'warn':'');
   document.getElementById('devM').innerHTML=
     mCard('CP Crash',k.crsh+'건',davg(k.crsh,days),k.crsh>0?'danger':'')+
-    mCard('SIM 탈착',k.simd+'건',davg(k.simd,days));
+    mCard('SIM 탈착',k.simd+'건',davg(k.simd,days))+
+    mCard('RFPD',k.rfpd+'건',davg(k.rfpd,days))+
+    mCard('MIPI',k.mipi+'건',davg(k.mipi,days));
   renderNoti();
 }
 
@@ -535,7 +547,8 @@ function renderMuteTab(){
   if(!total){document.getElementById('muteContent').innerHTML='<div class="no-data">MUTE 데이터가 없습니다.</div>';return;}
   const soundRows=muteRows.filter(r=>SOUND_TYPES.some(t=>isOne(r[t.key])));
   const micRowsAll=muteRows.filter(r=>MIC_TYPES.some(t=>isOne(r[t.key])));
-  const unknownRows=muteRows.filter(r=>![...SOUND_TYPES,...MIC_TYPES].some(t=>isOne(r[t.key])));
+  const userRows=muteRows.filter(r=>USER_TYPES.some(t=>isOne(r[t.key])));
+  const unknownRows=muteRows.filter(r=>![...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].some(t=>isOne(r[t.key])));
   function buildCat(title,types,rows,badgeCls){
     const catTotal=rows.length;
     let h=`<div class="cat-box"><div class="cat-title"><span class="badge ${badgeCls}">${title}</span><span style="font-size:12px;color:#888">${catTotal}건</span></div>`;
@@ -561,16 +574,18 @@ function renderMuteTab(){
     ${mCard('Rx (수화) 이상',rxRows.length+'건',pct(rxRows.length,total)+'%',rxRows.length>0?'warn':'')}
     ${mCard('Tx (송화) 이상',txRows.length+'건',pct(txRows.length,total)+'%',txRows.length>0?'warn':'')}
     ${mCard('마이크 이상',micRowsAll.length+'건',pct(micRowsAll.length,total)+'%',micRowsAll.length>0?'warn':'')}
+    ${mCard('사용자 의도',userRows.length+'건',pct(userRows.length,total)+'%')}
     ${unknownRows.length>0?mCard('유형 미분류',unknownRows.length+'건',''):''}
   </div>`;
   html+=buildCat('Rx (수화) 이상 — RSMT · RNMT · DBMT',rxTypes,rxRows,'tb');
   html+=buildCat('Tx (송화) 이상 — UBMT',txTypes,txRows,'tp');
   html+=buildCat('마이크 이상',MIC_TYPES,micRowsAll,'tpk');
+  html+=buildCat('사용자 의도 — TXSF',USER_TYPES,userRows,'ttl');
   html+=`<div class="divider"></div><div class="st">일별 MUTE 유형 현황</div>`;
   getDates().forEach(d=>{
     const dRows=byFeat('MUTE',byDate(d));if(!dRows.length)return;
     html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · MUTE ${dRows.length}건</div><div class="mg">`;
-    [...SOUND_TYPES,...MIC_TYPES].forEach(t=>{
+    [...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].forEach(t=>{
       const n=dRows.filter(r=>isOne(r[t.key])).length;if(!n)return;
       const ecnts=dRows.filter(r=>isOne(r[t.key])).map(r=>fNum(r.ECNT)).filter(v=>v!==null);
       const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
@@ -783,7 +798,7 @@ function getRawCause(r){
   if(f==='RLF'){const v=r.CAU??'';return v!==''?`${v} : ${CAU_CODES[String(v)]||'Unknown'}`:''}
   if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>`${v} : ${CAU_CODES[String(v)]||'Unknown'}`).join(' / ');}
   if(f==='DROP'){const c=String(r.SIPR||'').trim();return c?`${c} : ${DROP_CAUSES[c]||'Unknown'}`:''}
-  if(f==='MUTE'){const keys=['RSMT','RNMT','DBMT','UBMT','SAMS','SMBU','TXMT','MCST'];return keys.filter(k=>r[k]==='1'||r[k]===1).join(', ');}
+  if(f==='MUTE'){const keys=['RSMT','RNMT','DBMT','UBMT','SAMS','SMBU','TXMT','MCST','TXSF'];return keys.filter(k=>r[k]==='1'||r[k]===1).join(', ');}
   if(f==='SCGF'){const v=String(r.Ftyp??'').trim();return v?`${v} : ${SCGF_FTYP[v]||'Unknown'}`:''}
   if(f==='PSCI')return r.FLCD??'';
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
