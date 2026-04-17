@@ -228,6 +228,8 @@ const SOUND_TYPES=[
 const CAU_CODES={'0':'Unknown','1':'Max Retransmission','2':'T310 Expired','3':'SIB Read Failure','4':'RA Failure','5':'Beam Failure Recovery Failure','6':'Reconfig Failure','7':'Handover Failure','8':'RF Unavailable'};
 const DROP_CAUSES={'404':'Not Found','408':'Request Timeout','415':'Unsupported Media Type','480':'Temporary Unavailable','481':'Call Transaction does not exist','484':'Address Incomplete','487':'Request Terminated','498':'Bad event','500':'Server internal error','501':'Not Implemented','503':'Service Unavailable','504':'Server Timeout','603':'Decline','605':'Does not exist anywhere','708':'TimerF timeout','709':'TimerB timeout','1101':'Call session abort','1103':'Call session timeout','1107':'End call NW Handover','1114':'Invite Timeout','1115':'IMS De-registraion','1116':'Call barred due to SSAC','1401':'RTP Timeout','1402':'RTCP Timeout','1804':'Call end by CP CRASH'};
 const PLMN_OP={'45005':'SKT','45006':'LGU+','45008':'KT','45010':'공동망'};
+const SCGF_FTYP={'0':'T310 Expiry','1':'randomAccessProblem','2':'RLC MaxNumRetx','3':'SCG_ChangeFailure','4':'SCG_ReconfigFailure','5':'SRB3-IntergrityFailure','6':'BeamRecoveryFailure','B':'Battery','H':'Heat(High Temperature)','L':'Low TP'};
+const REGI_CAUSES={'200':'OK','201':'OK_AFTER_FAIL','403':'IMS Regi Fail','708':'TIMEOUT','1009':'EMPTY_PCSCF','1010':'REGI_THROTTLED','1014':'GVN_NOT_READY','1018':'TRY_RCS_CONFIG','1019':'DM_TRIGGERED','1204':'NO_MMTEL_USER_SETTINGS_OFF (사용자 HD Voice OFF)','1210':'NO_MMTEL_3G_PREFFERED_MODE (3G 우선모드 설정)','3002':'PDN_DISCONNECTED','3012':'DEFAULT NW CHANGED (WIFI - LTE 전환 예상)','3023':'FLIGHT MODE ON','3024':'RIL_INVOKE','3041':'TEMPORARY FAILURE'};
 const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
@@ -782,8 +784,9 @@ function getRawCause(r){
   if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>`${v} : ${CAU_CODES[String(v)]||'Unknown'}`).join(' / ');}
   if(f==='DROP'){const c=String(r.SIPR||'').trim();return c?`${c} : ${DROP_CAUSES[c]||'Unknown'}`:''}
   if(f==='MUTE'){const keys=['RSMT','RNMT','DBMT','UBMT','SAMS','SMBU','TXMT','MCST'];return keys.filter(k=>r[k]==='1'||r[k]===1).join(', ');}
+  if(f==='SCGF'){const v=String(r.Ftyp??'').trim();return v?`${v} : ${SCGF_FTYP[v]||'Unknown'}`:''}
   if(f==='PSCI')return r.FLCD??'';
-  if(f==='REGI')return r.FRSN??'';
+  if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'||f==='PDPI')return r.ENDR??'';
   if(f==='ATTF'||f==='ATTI')return r.EMMC??r.ESMC??'';
   return'';
@@ -803,6 +806,11 @@ function buildRawRows(){
 const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
 function getRawBandDLCh(r){
   if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?`Band ${b}`:''}
+  if(r.Feature==='SCGF'){
+    const lte=r.MBnd??r.LBnd??'';const nr=r.SBnd??r.NBnd??'';
+    const parts=[];if(lte)parts.push(`${lte}(LTE)`);if(nr)parts.push(`${nr}(NR)`);
+    return parts.join(' - ');
+  }
   const dch=r.DLCh??'';if(!dch)return'';
   const band=BAND_MAP[String(dch)];
   return band!=null?`Band ${band} (${dch})`:String(dch);
