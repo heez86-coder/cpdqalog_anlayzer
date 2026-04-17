@@ -407,7 +407,7 @@ function buildStationMap(){
       if(f==='CEND')s.cends.push(r);
       if(f==='DROP'){
         s.drops.push(r);
-        const rsrp=fNum(r.RxP0),sinr=fNum(r.SNR0);
+        const rsrp=getDropRSRP(r),sinr=getDropSINR(r);
         if(rsrp!==null)s.dropRsrp.push(rsrp);if(sinr!==null)s.dropSinr.push(sinr);
         const r0=fNum(r.RxP0),r1=fNum(r.RxP1);
         if(r0!==null&&r1!==null&&Math.abs(r0-r1)>=20)s.antDiffDrops.push({...r,diff:Math.abs(r0-r1)});
@@ -575,20 +575,16 @@ function renderDropTab(){
   const dropRows=byFeat('DROP');
   const total=dropRows.length;
   if(!total){document.getElementById('dropContent').innerHTML='<div class="no-data">DROP 데이터가 없습니다.</div>';return;}
-  const rxp0=dropRows.map(r=>fNum(r.RxP0)).filter(v=>v!==null);
-  const rxp1=dropRows.map(r=>fNum(r.RxP1)).filter(v=>v!==null);
-  const snr0=dropRows.map(r=>fNum(r.SNR0)).filter(v=>v!==null);
-  const snr1=dropRows.map(r=>fNum(r.SNR1)).filter(v=>v!==null);
+  const rsrps=dropRows.map(getDropRSRP).filter(v=>v!==null);
+  const sinrs=dropRows.map(getDropSINR).filter(v=>v!==null);
   const antDiff=dropRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
-  const weakSig=dropRows.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100);
-  const lowSnr=dropRows.filter(r=>fNum(r.SNR0)!==null&&fNum(r.SNR0)<0);
+  const weakSig=dropRows.filter(r=>getDropRSRP(r)!==null&&getDropRSRP(r)<-100);
+  const lowSnr=dropRows.filter(r=>getDropSINR(r)!==null&&getDropSINR(r)<0);
   const fmtV=v=>v!==null?v.toFixed(1):'-';
   let html=`<div class="st">전체 DROP 요약</div><div class="mg">
     ${mCard('총 DROP',total+'건','')}
-    ${mCard('avg RxP0',fmtV(avgArr(rxp0))+'dBm','수신전력 Ant0',avgArr(rxp0)<-100?'warn':'')}
-    ${mCard('avg RxP1',fmtV(avgArr(rxp1))+'dBm','수신전력 Ant1',avgArr(rxp1)<-100?'warn':'')}
-    ${mCard('avg SNR0',fmtV(avgArr(snr0))+'dB','SNR Ant0',avgArr(snr0)<0?'warn':'')}
-    ${mCard('avg SNR1',fmtV(avgArr(snr1))+'dB','SNR Ant1',avgArr(snr1)<0?'warn':'')}
+    ${mCard('avg RSRP',fmtV(avgArr(rsrps))+'dBm','수신전력 평균',avgArr(rsrps)<-100?'warn':'')}
+    ${mCard('avg SINR',fmtV(avgArr(sinrs))+'dB','SINR 평균',avgArr(sinrs)<0?'warn':'')}
     ${mCard('Ant Diff ≥20dB',antDiff.length+'건',pct(antDiff.length,total)+'%',antDiff.length>0?'danger':'')}
     ${mCard('약전계 DROP',weakSig.length+'건','RxP0 < -100dBm',weakSig.length>0?'warn':'')}
     ${mCard('저SNR DROP',lowSnr.length+'건','SNR0 < 0dB',lowSnr.length>0?'warn':'')}
@@ -613,13 +609,13 @@ function renderDropTab(){
   html+=`<div class="divider"></div><div class="st">일별 DROP 현황</div>`;
   getDates().forEach(d=>{
     const dRows=byFeat('DROP',byDate(d));if(!dRows.length)return;
-    const r0=dRows.map(r=>fNum(r.RxP0)).filter(v=>v!==null);
-    const s0=dRows.map(r=>fNum(r.SNR0)).filter(v=>v!==null);
+    const r0=dRows.map(getDropRSRP).filter(v=>v!==null);
+    const s0=dRows.map(getDropSINR).filter(v=>v!==null);
     const ad=dRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
     html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · DROP ${dRows.length}건</div><div class="mg">
       ${mCard('DROP',dRows.length+'건','')}
-      ${r0.length?mCard('avg RxP0',avgArr(r0).toFixed(1)+'dBm','',avgArr(r0)<-100?'warn':''):''}
-      ${s0.length?mCard('avg SNR0',avgArr(s0).toFixed(1)+'dB','',avgArr(s0)<0?'warn':''):''}
+      ${r0.length?mCard('avg RSRP',avgArr(r0).toFixed(1)+'dBm','',avgArr(r0)<-100?'warn':''):''}
+      ${s0.length?mCard('avg SINR',avgArr(s0).toFixed(1)+'dB','',avgArr(s0)<0?'warn':''):''}
       ${ad.length?mCard('Ant Diff',ad.length+'건','','danger'):''}
     </div></div>`;
   });
@@ -676,13 +672,20 @@ function renderDaily(){
 }
 function renderTrend(){
   const dates=getDates();
-  const dr=[],mr=[],rr=[],cc=[];
-  dates.forEach(d=>{const k=calcKPI(byDate(d));dr.push(parseFloat(k.dropRate));mr.push(parseFloat(k.muteRate));rr.push(parseFloat(k.rlfRate));cc.push(k.total);});
+  const dr=[],mr=[],rr=[],cc=[],muteCnt=[],dropCnt=[],rlfCnt=[];
+  dates.forEach(d=>{
+    const rows=byDate(d);const k=calcKPI(rows);
+    dr.push(parseFloat(k.dropRate));mr.push(parseFloat(k.muteRate));rr.push(parseFloat(k.rlfRate));cc.push(k.total);
+    muteCnt.push(byFeat('MUTE',rows).reduce((s,r)=>s+(fNum(r.ECNT)||0),0));
+    dropCnt.push(byFeat('DROP',rows).length);
+    rlfCnt.push(allRlfEvents.filter(e=>e.Date===d).length);
+  });
   const labels=dates.map(d=>d.slice(5));
-  document.getElementById('trendContent').innerHTML=`<div class="st">일별 발생률 추이 (%)</div><div style="position:relative;height:240px;margin-bottom:2rem"><canvas id="c1"></canvas></div><div class="st">일별 통화횟수</div><div style="position:relative;height:200px"><canvas id="c2"></canvas></div>`;
+  document.getElementById('trendContent').innerHTML=`<div class="st">일별 발생률 추이 (%)</div><div style="position:relative;height:240px;margin-bottom:1.5rem"><canvas id="c1"></canvas></div><div class="st">일별 이벤트 카운트 (MUTE ECNT합 · DROP · RLF)</div><div style="position:relative;height:220px;margin-bottom:1.5rem"><canvas id="c3"></canvas></div><div class="st">일별 통화횟수</div><div style="position:relative;height:200px"><canvas id="c2"></canvas></div>`;
   setTimeout(()=>{
     charts.forEach(c=>c.destroy());charts=[];
     charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[{label:'Calldrop율',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e74c3c',borderWidth:2.5},{label:'MUTE율',data:mr,borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#e67e22',borderWidth:2.5},{label:'RLF율',data:rr,borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,0.07)',tension:.3,pointRadius:5,pointBackgroundColor:'#2980b9',borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true}},scales:{x:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}},y:{ticks:{font:{size:12},callback:v=>v.toFixed(1)+'%'},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
+    charts.push(new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:[{label:'MUTE (ECNT합)',data:muteCnt,backgroundColor:'rgba(230,126,34,0.75)',borderColor:'#e67e22',borderWidth:1.5,borderRadius:4,stack:'ev'},{label:'DROP',data:dropCnt,backgroundColor:'rgba(231,76,60,0.75)',borderColor:'#e74c3c',borderWidth:1.5,borderRadius:4,stack:'ev'},{label:'RLF',data:rlfCnt,backgroundColor:'rgba(41,128,185,0.75)',borderColor:'#2980b9',borderWidth:1.5,borderRadius:4,stack:'ev'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{font:{size:12}}}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{stacked:true,ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}}},interaction:{mode:'index',intersect:false}}}));
     charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[{label:'통화횟수',data:cc,backgroundColor:'#aed6f1',borderColor:'#2980b9',borderWidth:1.5,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:12}},grid:{display:false}},y:{ticks:{font:{size:12}},grid:{color:'rgba(0,0,0,0.05)'}}}}}));
   },100);
 }
@@ -702,7 +705,20 @@ function filterRaw(){
   });rawPage=1;rawOpenIdx=new Set();renderRaw();
 }
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
-const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','DLCh','RSRP','RxP0','RxP1','SNR0','SNR1','CINR'];
+function getDropRSRP(r){const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null?(a+b)/2:a;}
+function getDropSINR(r){const a=fNum(r.SNR0),b=fNum(r.SNR1);return a!==null&&b!==null?(a+b)/2:a;}
+function getRawRSRP(r){if(r.Feature==='DROP'){const v=getDropRSRP(r);return v!==null?v.toFixed(1):'';}return r.RSRP??'';}
+function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}return r.CINR??'';}
+function getRawCause(r){
+  const f=r.Feature;
+  if(f==='RLFI'){const cs=[1,2,3,4].map(i=>r[`CAU${i}`]).filter(v=>v!==undefined&&v!=='');return cs.map(v=>CAU_CODES[String(v)]||`Code ${v}`).join(' / ');}
+  if(f==='DROP')return r.SIPR??'';
+  if(f==='REGI')return r.FRSN??'';
+  if(f==='PDPF'||f==='PDPI')return r.ENDR??'';
+  if(f==='ATTF'||f==='ATTI')return r.EMMC??r.ESMC??'';
+  return'';
+}
+const RAW_FIXED=['Date','Time','Feature','TAC_','PhID','DLCh','RSRP','SINR','Cause'];
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -719,6 +735,9 @@ function renderRaw(){
     const mainRow='<tr>'+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return`<td><span class="badge" style="background:${col.bg};color:${col.tc}">${v}</span></td>`;}
+      if(c==='RSRP')return`<td>${getRawRSRP(r)}</td>`;
+      if(c==='SINR')return`<td>${getRawSINR(r)}</td>`;
+      if(c==='Cause'){const cv=getRawCause(r);return`<td style="font-size:11px;color:var(--text-secondary);max-width:200px;white-space:normal;line-height:1.4">${cv}</td>`;}
       return`<td>${v}</td>`;
     }).join('')+`<td><button class="det-btn" onclick="toggleDetail(${gi})" title="세부 정보">${isOpen?'▲':'▼'}</button></td></tr>`;
     if(!isOpen)return mainRow;
