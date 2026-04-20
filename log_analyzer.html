@@ -132,9 +132,9 @@ tbody td{padding:9px 13px;color:var(--text-primary);font-size:12px;white-space:n
 /* detail row */
 .detail-row td{padding:0!important}
 .detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px 16px;padding:12px 18px;background:var(--blue-50);border-top:1px solid var(--blue-100)}
-.detail-kv{font-size:11px;display:flex;gap:5px;align-items:baseline}
+.detail-kv{font-size:11px;display:flex;gap:5px;align-items:baseline;min-width:0}
 .detail-k{color:var(--text-secondary);flex-shrink:0;font-weight:600}
-.detail-v{color:var(--text-primary);font-weight:700;word-break:break-all}
+.detail-v{color:var(--text-primary);font-weight:700;word-break:break-all;min-width:0;overflow-wrap:anywhere}
 .det-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px 7px;color:var(--text-secondary);border-radius:4px;transition:all .15s}
 .det-btn:hover{background:var(--blue-50);color:var(--blue-700)}
 
@@ -363,6 +363,7 @@ function doParse(text,filename){
   allCols=['Date','Time','Feature',...[...ks].filter(k=>!['Date','Time','Feature'].includes(k))];
   buildRlfEvents();
   buildStationMap();
+  annotateSIMD();
   document.getElementById('uploadBox').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('resetBtn').style.display='';
@@ -501,6 +502,24 @@ function renderHeader(filename){
   if(op)lines.push(`사업자 : ${op}`);
   cl.innerHTML=lines.join('<br>');cl.style.display='block';
 }
+function annotateSIMD(){
+  const EXCL=new Set(['Date','Time','Feature']);
+  const dates=getDates();
+  let prevSnap=null;
+  dates.forEach(d=>{
+    const simdRows=byFeat('SIMD',byDate(d));
+    if(!simdRows.length)return;
+    const snap={};
+    simdRows.forEach(r=>Object.entries(r).forEach(([k,v])=>{if(!EXCL.has(k)&&v!==''&&v!==null&&v!==undefined)snap[k]=String(v);}));
+    if(prevSnap!==null){
+      const allKeys=new Set([...Object.keys(snap),...Object.keys(prevSnap)]);
+      const diffs=[];
+      allKeys.forEach(k=>{const cv=snap[k]??'';const pv=prevSnap[k]??'';if(cv!==pv)diffs.push(`${k}: ${pv||'-'}→${cv||'-'}`);});
+      if(diffs.length)simdRows.forEach(r=>r._simdDiff=diffs);
+    }
+    prevSnap=snap;
+  });
+}
 function calcKPI(rows){
   const cend=cnt('CEND',rows),drop=cnt('DROP',rows),mute=cnt('MUTE',rows),total=cend+drop;
   const rlfcRows=byFeat('RLFC',rows);
@@ -511,8 +530,9 @@ function calcKPI(rows){
   const nos1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.NOS1||0,10)||0)):0;
   const rcr1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.RCR1||0,10)||0)):0;
   const sim1=simdRows.length?Math.max(...simdRows.map(r=>parseInt(r.SIM1||0,10)||0)):0;
+  const simd=new Set(simdRows.filter(r=>r._simdDiff).map(r=>r.Date)).size;
   return{cend,drop,mute,total,dropRate:pct(drop,total),muteRate:pct(mute,cend),lrlf,ldch,rlfRate:pct(lrlf,ldch),
-    crsh:cnt('CRSH',rows),simd:cnt('SIMD',rows),dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows),
+    crsh:cnt('CRSH',rows),simd,dast:cnt('DAST',rows),mmrj:cnt('MMRJ',rows),rfpd:cnt('RFPD',rows),
     scgf:cnt('SCGF',rows),attf:cnt('ATTF',rows),atti:cnt('ATTI',rows),pdpf:cnt('PDPF',rows),pdpi:cnt('PDPI',rows),mipi:cnt('MIPI',rows),
     nsvc,nos1,rcr1,sim1};
 }
@@ -811,13 +831,16 @@ function initRaw(){
     document.getElementById('rawDateTo').value=dates[dates.length-1];
   }
   const fc=document.getElementById('rawFeatChk');
-  const btnS='style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:600;color:var(--text-secondary)"';
-  fc.innerHTML=`<span style="font-weight:700;color:var(--text-secondary);margin-right:4px;line-height:2">표시:</span>`+
-    `<button ${btnS} onclick="rawChkAll(true)">전체</button>`+
-    `<button ${btnS} onclick="rawChkAll(false)">전체해제</button>`+
-    `<button ${btnS} style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--blue-400);background:var(--blue-50);cursor:pointer;font-weight:600;color:var(--blue-700)" onclick="rawChkCall()">통화데이터</button>`+
-    `<span style="color:var(--border);margin:0 4px">|</span>`+
-    feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('');
+  fc.innerHTML=
+    `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">`+
+    `<span style="font-weight:700;color:var(--text-secondary);margin-right:4px">표시:</span>`+
+    `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid #27ae60;background:#eafaf1;cursor:pointer;font-weight:600;color:#1e8449" onclick="rawChkAll(true)"><i class="fa-solid fa-circle-check" style="margin-right:3px"></i>전체</button>`+
+    `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid #e74c3c;background:#fdecea;cursor:pointer;font-weight:600;color:#c0392b" onclick="rawChkAll(false)"><i class="fa-solid fa-circle-xmark" style="margin-right:3px"></i>전체해제</button>`+
+    `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--blue-400);background:var(--blue-50);cursor:pointer;font-weight:600;color:var(--blue-700)" onclick="rawChkCall()"><i class="fa-solid fa-phone" style="margin-right:3px"></i>통화데이터</button>`+
+    `</div>`+
+    `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px">`+
+    feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('')+
+    `</div>`;
   rawFiltered=[...rawRows];rawPage=1;renderRaw();
 }
 function filterRaw(){
@@ -892,6 +915,8 @@ function getRawNote(r){
   if(f==='MIPI'){const mid=r.MID_??'',pid=r.PID_??'';if(mid||pid)notes.push(`MID : ${mid}, PID : ${pid} 확인필요`);}
   if(f==='RFPD'){const msg=r.MSG_??'';if(msg)notes.push(String(msg));}
   if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
+  if(f==='SIMD'&&r._simdDiff&&r._simdDiff.length)notes.push(r._simdDiff.join(' · '));
+  if(f==='TFEI'){const flds=['TE_C','XO_C','TF_C'];const nz=flds.filter(k=>{const v=parseFloat(r[k]??'');return!isNaN(v)&&v!==0;}).map(k=>`${k}:${r[k]}`);if(nz.length)notes.push(nz.join(', '));}
   if(String(r.ACT_??'').trim()==='2')notes.push('3G확인필요');
   return notes.join(' · ');
 }
