@@ -207,8 +207,11 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
     <div id="tab-daily" style="display:none"><div id="dailyContent"></div></div>
     <div id="tab-trend" style="display:none"><div id="trendContent"></div></div>
     <div id="tab-raw" style="display:none">
-      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-        <input type="text" id="rawSearch" placeholder="검색..." oninput="filterRaw()" style="flex:1;min-width:140px">
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="rawSearch" placeholder="검색..." oninput="filterRaw()" style="flex:1;min-width:120px">
+        <input type="date" id="rawDateFrom" onchange="filterRaw()" title="시작일">
+        <span style="color:var(--text-secondary);font-size:12px">~</span>
+        <input type="date" id="rawDateTo" onchange="filterRaw()" title="종료일">
         <button class="btn" onclick="exportCSV()">CSV 내보내기</button>
       </div>
       <div id="rawFeatChk" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:var(--blue-50);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px"></div>
@@ -560,8 +563,7 @@ function renderNoti(){
   const lbl={critical:'위험',warning:'주의',weak:'약전계'};
   const lc={critical:'tr',warning:'ta',weak:'tp'};
   stations.forEach(s=>{
-    const rateStr=s.problemRate>0?` · 이상률 ${s.problemRate.toFixed(1)}%`:'';
-    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${rateStr}${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
   });
   document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
 }
@@ -798,19 +800,35 @@ function renderTrend(){
   },100);
 }
 
+function rawChkAll(v){document.querySelectorAll('.feat-chk').forEach(c=>c.checked=v);filterRaw();}
+function rawChkCall(){const call=new Set(['CEND','PSCI','MUTE','DROP']);document.querySelectorAll('.feat-chk').forEach(c=>c.checked=call.has(c.value));filterRaw();}
 function initRaw(){
   const rawRows=buildRawRows();
   const feats=[...new Set(rawRows.map(r=>r.Feature))].sort();
+  const dates=getDates();
+  if(dates.length){
+    document.getElementById('rawDateFrom').value=dates[0];
+    document.getElementById('rawDateTo').value=dates[dates.length-1];
+  }
   const fc=document.getElementById('rawFeatChk');
+  const btnS='style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-weight:600;color:var(--text-secondary)"';
   fc.innerHTML=`<span style="font-weight:700;color:var(--text-secondary);margin-right:4px;line-height:2">표시:</span>`+
+    `<button ${btnS} onclick="rawChkAll(true)">전체</button>`+
+    `<button ${btnS} onclick="rawChkAll(false)">전체해제</button>`+
+    `<button ${btnS} style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--blue-400);background:var(--blue-50);cursor:pointer;font-weight:600;color:var(--blue-700)" onclick="rawChkCall()">통화데이터</button>`+
+    `<span style="color:var(--border);margin:0 4px">|</span>`+
     feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('');
   rawFiltered=[...rawRows];rawPage=1;renderRaw();
 }
 function filterRaw(){
   const q=document.getElementById('rawSearch').value.toLowerCase();
   const checked=[...document.querySelectorAll('.feat-chk:checked')].map(c=>c.value);
+  const df=document.getElementById('rawDateFrom').value;
+  const dt=document.getElementById('rawDateTo').value;
   rawFiltered=buildRawRows().filter(r=>{
     if(!checked.includes(r.Feature))return false;
+    if(df&&r.Date<df)return false;
+    if(dt&&r.Date>dt)return false;
     if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
     return true;
   });rawPage=1;rawOpenIdx=new Set();renderRaw();
