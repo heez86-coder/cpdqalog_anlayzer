@@ -243,6 +243,7 @@ const MIC_TYPES=[
   {key:'SMBU',label:'마이크 구멍 막힘',color:'#7f8c8d',tag:'tg',desc:'사용자 원인'},
   {key:'MCST',label:'MIC 입력신호 이상',color:'#922b21',tag:'tr',desc:'HW 이상 의심'},
 ];
+const MIC_VAL_DESC={'1':'메인(1st) 마이크 확인필요','2':'상단(2nd) 마이크 확인필요','3':'메인(1st)+상단(2nd) 마이크 확인필요','4':'후면(3rd) 마이크 확인필요','5':'메인(1st)+후면(3rd) 마이크 확인필요','6':'상단(2nd)+후면(3rd) 마이크 확인필요','7':'모든 마이크(1st+2nd+3rd) 확인필요'};
 const USER_TYPES=[
   {key:'TXSF',label:'송화음 차단',color:'#16a085',tag:'ttl',desc:'사용자 의도적 송화 차단'},
 ];
@@ -567,11 +568,11 @@ function renderOverview(){
 
 function renderNoti(){
   let html='';
-  const micRows=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>isOne(r[t.key])));
+  const micRows=byFeat('MUTE').filter(r=>MIC_TYPES.some(t=>(t.key==='SAMS'||t.key==='MCST')?parseInt(r[t.key]||0,10)>0:isOne(r[t.key])));
   if(micRows.length>0){
-    const samsCnt=micRows.filter(r=>isOne(r.SAMS)).length;
+    const samsCnt=micRows.filter(r=>parseInt(r.SAMS||0,10)>0).length;
     const smbuCnt=micRows.filter(r=>isOne(r.SMBU)).length;
-    const mcstCnt=micRows.filter(r=>isOne(r.MCST)).length;
+    const mcstCnt=micRows.filter(r=>parseInt(r.MCST||0,10)>0).length;
     html+=`<div class="nc mic"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge tpk">마이크 이상 감지</span><span class="nt">마이크 관련 MUTE ${micRows.length}건 발생</span></div><div class="ns" style="margin-top:6px">통화 품질과 무관한 마이크 하드웨어/사용자 원인 이상</div><div class="ntags">${samsCnt?`<span class="tag tpk">대체 마이크 스위칭 ${samsCnt}건</span>`:''}${smbuCnt?`<span class="tag tg">마이크 막힘 ${smbuCnt}건</span>`:''}${mcstCnt?`<span class="tag tr">MIC 입력신호 이상 ${mcstCnt}건</span>`:''}</div></div>`;
   }
   const antDiffSt=Object.values(stationMap).filter(s=>s.hasAntDiff).sort((a,b)=>b.antDiffDrops.length-a.antDiffDrops.length);
@@ -593,22 +594,27 @@ function renderMuteTab(){
   const total=muteRows.length;
   if(!total){document.getElementById('muteContent').innerHTML='<div class="no-data">MUTE 데이터가 없습니다.</div>';return;}
   const soundRows=muteRows.filter(r=>SOUND_TYPES.some(t=>isOne(r[t.key])));
-  const micRowsAll=muteRows.filter(r=>MIC_TYPES.some(t=>isOne(r[t.key])));
+  const micRowsAll=muteRows.filter(r=>MIC_TYPES.some(t=>(t.key==='SAMS'||t.key==='MCST')?parseInt(r[t.key]||0,10)>0:isOne(r[t.key])));
   const userRows=muteRows.filter(r=>USER_TYPES.some(t=>isOne(r[t.key])));
-  const unknownRows=muteRows.filter(r=>![...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].some(t=>isOne(r[t.key])));
+  const unknownRows=muteRows.filter(r=>![...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].some(t=>(t.key==='SAMS'||t.key==='MCST')?parseInt(r[t.key]||0,10)>0:isOne(r[t.key])));
   function buildCat(title,types,rows,badgeCls){
     const catTotal=rows.length;
     let h=`<div class="cat-box"><div class="cat-title"><span class="badge ${badgeCls}">${title}</span><span style="font-size:12px;color:#888">${catTotal}건</span></div>`;
-    const maxN=Math.max(...types.map(t=>rows.filter(r=>isOne(r[t.key])).length),1);
     types.forEach(t=>{
-      const tRows=rows.filter(r=>isOne(r[t.key]));const n=tRows.length;
+      const tRows=(t.key==='SAMS'||t.key==='MCST')?rows.filter(r=>parseInt(r[t.key]||0,10)>0):rows.filter(r=>isOne(r[t.key]));
+      const n=tRows.length;
       const p=total>0?(n/total*100):0;
       const ecnts=tRows.map(r=>fNum(r.ECNT)).filter(v=>v!==null);
       const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
       const highE=ecnts.filter(v=>v>=5).length;
       const blers=t.bler?tRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0):[];
       const avgBler=blers.length?avgArr(blers).toFixed(1):null;
-      h+=`<div class="bar-row"><div class="bar-label"><span style="font-size:10px;font-weight:700;color:var(--blue-600);margin-right:4px">[${t.key}]</span>${t.label}<br><span style="font-size:11px;color:#aaa">${t.desc}</span></div><div class="bar-track"><div class="bar-fill" style="width:${maxN>0?(n/maxN*100).toFixed(1):0}%;background:${t.color}"></div></div><div class="bar-val">${n}건 (${p.toFixed(1)}%)${n>0?`&nbsp;<span style="font-size:11px;color:#888">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span>`:''}${avgBler!==null?`&nbsp;<span style="font-size:11px;color:#b7640a">BLER avg ${avgBler}%</span>`:''}</div></div>`;
+      h+=`<div class="bar-row"><div class="bar-label"><span style="font-size:10px;font-weight:700;color:var(--blue-600);margin-right:4px">[${t.key}]</span>${t.label}<br><span style="font-size:11px;color:#aaa">${t.desc}</span></div><div class="bar-track"><div class="bar-fill" style="width:${p.toFixed(1)}%;background:${t.color}"></div></div><div class="bar-val">${n}건 (${p.toFixed(1)}%)${n>0?`&nbsp;<span style="font-size:11px;color:#888">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span>`:''}${avgBler!==null?`&nbsp;<span style="font-size:11px;color:#b7640a">BLER avg ${avgBler}%</span>`:''}</div></div>`;
+      if((t.key==='SAMS'||t.key==='MCST')&&n>0){
+        const valCnts={};tRows.forEach(r=>{const v=String(parseInt(r[t.key]||0,10));valCnts[v]=(valCnts[v]||0)+1;});
+        const breakdown=Object.entries(valCnts).sort((a,b)=>Number(a[0])-Number(b[0])).map(([v,c])=>`<span style="margin-right:12px"><b style="color:${t.color}">${v}</b> ${MIC_VAL_DESC[v]||'?'} <span style="color:var(--blue-700);font-weight:700">(${c}건)</span></span>`).join('');
+        h+=`<div style="font-size:11px;padding:2px 12px 8px 168px;color:#555">${breakdown}</div>`;
+      }
     });
     return h+'</div>';
   }
@@ -633,7 +639,7 @@ function renderMuteTab(){
     const dRows=byFeat('MUTE',byDate(d));if(!dRows.length)return;
     html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · MUTE ${dRows.length}건</div><div class="mg">`;
     [...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].forEach(t=>{
-      const n=dRows.filter(r=>isOne(r[t.key])).length;if(!n)return;
+      const n=dRows.filter(r=>(t.key==='SAMS'||t.key==='MCST')?parseInt(r[t.key]||0,10)>0:isOne(r[t.key])).length;if(!n)return;
       const ecnts=dRows.filter(r=>isOne(r[t.key])).map(r=>fNum(r.ECNT)).filter(v=>v!==null);
       const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
       const highE=ecnts.filter(v=>v>=5).length;
@@ -674,12 +680,11 @@ function renderDropTab(){
   </div>`;
   if(causeList.length){
     html+=`<div class="divider"></div><div class="st">DROP Cause 분석 (SIPR 코드)</div><div class="cat-box">`;
-    const maxC=causeList[0][1];
     causeList.forEach(([code,n])=>{
       const desc=DROP_CAUSES[code]||'Unknown';
       html+=`<div class="bar-row">
         <div class="bar-label" style="width:260px"><span style="font-weight:700;color:var(--red)">${code}</span><span style="font-size:11px;color:var(--text-secondary);margin-left:8px">${desc}</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(n/maxC*100).toFixed(1)}%;background:var(--red)"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(n/total*100).toFixed(1)}%;background:var(--red)"></div></div>
         <div class="bar-val">${n}건 (${pct(n,total)}%)</div>
       </div>`;
     });
@@ -689,13 +694,12 @@ function renderDropTab(){
   const stDrops=Object.values(stationMap).filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length);
   if(stDrops.length){
     html+=`<div class="divider"></div><div class="st">기지국별 DROP 현황</div><div class="cat-box">`;
-    const maxD=stDrops[0].drops.length;
     stDrops.forEach((s,i)=>{
       const adCnt=s.antDiffDrops.length;
       const wkCnt=s.drops.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100).length;
       html+=`<div class="bar-row">
         <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/maxD*100).toFixed(1)}%;background:#e74c3c"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/total*100).toFixed(1)}%;background:#e74c3c"></div></div>
         <div class="bar-val">${s.drops.length}건${adCnt?` &nbsp;<span class="badge ttl" style="font-size:10px">Ant Diff ${adCnt}</span>`:''}${wkCnt?` &nbsp;<span class="badge tp" style="font-size:10px">약전계 ${wkCnt}</span>`:''}</div>
       </div>`;
     });
