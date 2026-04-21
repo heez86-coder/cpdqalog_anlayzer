@@ -748,17 +748,18 @@ function renderStationTable(){
   const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
+  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC(HEX)</th><th>TAC(DEC)</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
+    const tacDec=s.tac?parseInt(s.tac,16):NaN;
     const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
-      <td>${s.tac}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
+      <td>${s.tac}</td><td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
       <td style="color:${s.mutes.length>0?'#b7640a':'inherit'}">${s.mutes.length}</td>
@@ -766,7 +767,7 @@ function renderStationTable(){
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="11" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
