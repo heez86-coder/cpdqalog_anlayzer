@@ -128,6 +128,17 @@ tbody td{padding:9px 13px;color:var(--text-primary);font-size:12px;white-space:n
 .bar-fill{height:100%;border-radius:6px;transition:width .4s}
 .bar-val{font-size:12px;font-weight:600;color:var(--text-primary);min-width:200px;flex-shrink:0}
 .ecnt-high{color:var(--red);font-weight:700}
+/* day cards */
+.day-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.day-hdr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 16px;background:var(--blue-50);border-bottom:1px solid var(--blue-100)}
+.day-dt{font-size:13px;font-weight:800;color:var(--blue-800);letter-spacing:-.01em;flex-shrink:0}
+.day-body{padding:0}
+.day-row{display:flex;align-items:center;padding:7px 16px;border-bottom:1px solid var(--blue-50);border-left:3px solid transparent}
+.day-row:last-child{border-bottom:none}
+.day-key{font-size:10px;font-weight:800;color:var(--blue-600);width:52px;flex-shrink:0}
+.day-lbl{font-size:12px;color:var(--text-secondary);flex:1;min-width:120px}
+.day-cnt{font-size:13px;font-weight:700;color:var(--text-primary);width:46px;text-align:right;flex-shrink:0}
+.day-sub{font-size:11px;color:#94a3b8;margin-left:14px}
 
 /* detail row */
 .detail-row td{padding:0!important}
@@ -634,15 +645,15 @@ function renderMuteTab(){
   html+=`<div class="divider"></div><div class="st">일별 MUTE 유형 현황</div>`;
   getDates().forEach(d=>{
     const dRows=byFeat('MUTE',byDate(d));if(!dRows.length)return;
-    html+=`<div style="margin-bottom:1.25rem"><div class="st">${d} · MUTE ${dRows.length}건</div><div class="mg">`;
+    let body='';
     [...SOUND_TYPES,...MIC_TYPES,...USER_TYPES].forEach(t=>{
       const n=dRows.filter(r=>(t.key==='SAMS'||t.key==='MCST')?parseInt(r[t.key]||0,10)>0:isOne(r[t.key])).length;if(!n)return;
       const ecnts=dRows.filter(r=>isOne(r[t.key])).map(r=>fNum(r.ECNT)).filter(v=>v!==null);
       const avgE=ecnts.length?avgArr(ecnts).toFixed(1):'-';
       const highE=ecnts.filter(v=>v>=5).length;
-      html+=`<div class="mc"><div class="ml">${t.label}</div><div class="mv">${n}건</div><div class="ms">ECNT avg ${avgE}${highE>0?` · <span class="ecnt-high">≥5: ${highE}건</span>`:''}</div></div>`;
+      body+=`<div class="day-row" style="border-left-color:${t.color}"><span class="day-key">[${t.key}]</span><span class="day-lbl">${t.label}</span><span class="day-cnt">${n}건</span><span class="day-sub">ECNT avg ${avgE}${highE>0?` &nbsp;<span class="ecnt-high">⚠ ≥5: ${highE}건</span>`:''}</span></div>`;
     });
-    html+=`</div></div>`;
+    html+=`<div class="day-card"><div class="day-hdr"><span class="day-dt">${d}</span><span class="badge tb">MUTE ${dRows.length}건</span></div><div class="day-body">${body}</div></div>`;
   });
   document.getElementById('muteContent').innerHTML=html;
 }
@@ -710,18 +721,35 @@ function renderDropTab(){
     const r0=dRows.map(getDropRSRP).filter(v=>v!==null);
     const s0=dRows.map(getDropSINR).filter(v=>v!==null);
     const ad=dRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
-    html+=`<div style="margin-bottom:1.5rem"><div class="st">${d} · DROP ${dRows.length}건</div><div class="mg">
-      ${mCard('DROP',dRows.length+'건','')}
-      ${r0.length?mCard('avg RSRP',avgArr(r0).toFixed(1),'',avgArr(r0)<-100?'warn':''):''}
-      ${s0.length?mCard('avg SINR',avgArr(s0).toFixed(1),'',avgArr(s0)<0?'warn':''):''}
-      ${ad.length?mCard('Ant Diff',ad.length+'건','','danger'):''}
-    </div>
-    <div class="tw" style="margin-top:10px"><table>
-      <thead><tr><th style="width:70px">Time</th><th style="width:100px">PLMN</th><th style="width:60px">TAC</th><th style="width:55px">PCI</th><th style="width:65px">DLCh</th><th>SIPR (Cause)</th></tr></thead>
-      <tbody>${dRows.map(r=>{const sipr=String(r.SIPR||'').trim();return`<tr><td>${r.Time}</td><td>${plmnFmt(r.PLMN)}</td><td>${r.TAC_??''}</td><td>${r.PhID??''}</td><td>${r.DLCh??''}</td><td style="font-size:11px">${sipr?`${sipr} : ${DROP_CAUSES[sipr]||'Unknown'}`:''}</td></tr>`;}).join('')}
-      </tbody>
-    </table></div></div>`;
-  });
+    const rsrpAvg=r0.length?avgArr(r0).toFixed(1):null;
+    const sinrAvg=s0.length?avgArr(s0).toFixed(1):null;
+    const rsrpBad=rsrpAvg!==null&&parseFloat(rsrpAvg)<-100;
+    const sinrBad=sinrAvg!==null&&parseFloat(sinrAvg)<0;
+    const tRows=dRows.map(r=>{
+      const sipr=String(r.SIPR||'').trim();
+      const tacDec=r.TAC_?parseInt(r.TAC_,16):NaN;
+      const adRow=fNum(r.RxP0)!==null&&fNum(r.RxP1)!==null&&Math.abs(fNum(r.RxP0)-fNum(r.RxP1))>=20;
+      return`<tr${adRow?' style="background:#fff8f8"':''}>
+        <td>${r.Time}</td><td>${plmnFmt(r.PLMN)}</td>
+        <td>${r.TAC_??''}</td><td>${isNaN(tacDec)?'':tacDec}</td>
+        <td>${r.PhID??''}</td><td>${r.DLCh??''}</td>
+        <td style="font-size:11px">${sipr?`<span style="font-weight:600;color:var(--red)">${sipr}</span> ${DROP_CAUSES[sipr]||'Unknown'}`:''}</td>
+        <td>${adRow?`<span class="badge ttl" style="font-size:10px">Ant Diff</span>`:''}</td>
+      </tr>`;
+    }).join('');
+    html+=`<div class="day-card">
+      <div class="day-hdr">
+        <span class="day-dt">${d}</span>
+        <span class="badge tr">DROP ${dRows.length}건</span>
+        ${rsrpAvg!==null?`<span style="font-size:12px;color:${rsrpBad?'var(--red)':'var(--text-secondary)'}">RSRP avg <b>${rsrpAvg}</b></span>`:''}
+        ${sinrAvg!==null?`<span style="font-size:12px;color:${sinrBad?'var(--orange)':'var(--text-secondary)'}">SINR avg <b>${sinrAvg}</b></span>`:''}
+        ${ad.length?`<span class="badge ttl" style="font-size:10px">Ant Diff ${ad.length}건</span>`:''}
+      </div>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th style="width:72px">Time</th><th style="width:110px">PLMN</th><th style="width:72px">TAC(HEX)</th><th style="width:72px">TAC(DEC)</th><th style="width:52px">PCI</th><th style="width:60px">DLCh</th><th>Cause (SIPR)</th><th style="width:70px"></th></tr></thead>
+        <tbody>${tRows}</tbody>
+      </table></div>
+    </div>`;
   document.getElementById('dropContent').innerHTML=html;
 }
 function renderStationTable(){
