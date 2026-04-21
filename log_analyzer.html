@@ -910,11 +910,13 @@ function getRawNote(r){
   const f=r.Feature;
   const PATH_MAP={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
   const notes=[];
-  if(f==='MUTE'){const p=String(r.PATH??'').trim();if(PATH_MAP[p])notes.push(PATH_MAP[p]);}
+  if(f==='MUTE'){const p=String(r.PATH??'').trim();if(PATH_MAP[p])notes.push(PATH_MAP[p]);const ec=parseInt(r.ECNT||0,10);if(ec>=10)notes.push(`ECNT ${ec}회`);}
   if(f==='CEND'||f==='DROP'){
     const a=String(r.AUST??'').trim();if(PATH_MAP[a])notes.push(PATH_MAP[a]);
     const ct=String(r.Ctyp??'').trim();if(ct==='5')notes.push('Video call');else if(ct==='6')notes.push('Emergency call');
   }
+  if(f==='CEND'){const sec=parseInt(r.CTIM||0,10);if(sec>0){const m=Math.floor(sec/60),s=sec%60;notes.push(`통화시간 : ${m}분 ${s}초`);}}
+  if(f==='PSCI'){const fl=String(r.FLCD??'').trim();if(fl)notes.push(fl==='1803'?'캐치콜수신':`FLCD ${fl}`);}
   if(f==='MIPI'){const mid=r.MID_??'',pid=r.PID_??'';if(mid||pid)notes.push(`MID : ${mid}, PID : ${pid} 확인필요`);}
   if(f==='RFPD'){const msg=r.MSG_??'';if(msg)notes.push(String(msg));}
   if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
