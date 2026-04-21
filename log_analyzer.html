@@ -1012,7 +1012,17 @@ function toggleDetail(globalIdx){
 function renderRaw(){
   const start=(rawPage-1)*RP,page=rawFiltered.slice(start,start+RP);
   const ACT_MAP={'2':'3G','4':'LTE','6':'NR'};
-  document.getElementById('rawHead').innerHTML='<tr>'+RAW_FIXED.map(c=>'<th style="width:'+(RAW_COL_W[c]||70)+'px;text-align:center">'+c+'</th>').join('')+'<th style="width:32px"></th></tr>';
+  const GRP_COLORS=[
+    {bg:'#eff6ff',bd:'#3b82f6',lbl:'#1d4ed8'},
+    {bg:'#f0fdf4',bd:'#16a34a',lbl:'#15803d'},
+    {bg:'#fdf4ff',bd:'#a855f7',lbl:'#7e22ce'},
+    {bg:'#fff7ed',bd:'#ea580c',lbl:'#c2410c'},
+    {bg:'#f0fdfa',bd:'#0d9488',lbl:'#0f766e'},
+    {bg:'#fef9c3',bd:'#ca8a04',lbl:'#92400e'},
+  ];
+  const callNums={};let callCtr=0;
+  rawFiltered.forEach(r=>{if(r._grpKey&&!callNums[r._grpKey])callNums[r._grpKey]=++callCtr;});
+  document.getElementById('rawHead').innerHTML='<tr><th style="width:52px;text-align:center">Call</th>'+RAW_FIXED.map(c=>'<th style="width:'+(RAW_COL_W[c]||70)+'px;text-align:center">'+c+'</th>').join('')+'<th style="width:32px"></th></tr>';
   document.getElementById('rawBody').innerHTML=page.length?page.map((r,i)=>{
     const gi=start+i;
     const isOpen=rawOpenIdx.has(String(gi));
@@ -1021,8 +1031,11 @@ function renderRaw(){
     const isGrp=!!r._grpKey;
     const isFirst=isGrp&&(!prevR||prevR._grpKey!==r._grpKey);
     const isLast=isGrp&&(!nextR||nextR._grpKey!==r._grpKey);
-    const grpStyle=isGrp?'background:#f0f8ff;border-left:3px solid #3498db;'+(isFirst?'border-top:2px solid #3498db;':'')+(isLast?'border-bottom:2px solid #3498db;':''):'';
-    const mainRow='<tr style="'+grpStyle+'">'+RAW_FIXED.map(c=>{
+    const callNum=r._grpKey?callNums[r._grpKey]:null;
+    const gc=callNum?GRP_COLORS[(callNum-1)%GRP_COLORS.length]:null;
+    const grpStyle=gc?'background:'+gc.bg+';border-left:3px solid '+gc.bd+';'+(isFirst?'border-top:2px solid '+gc.bd+';':'')+(isLast?'border-bottom:2px solid '+gc.bd+';':''):''
+    const callCell=isFirst&&gc?'<td style="text-align:center;padding:4px 2px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:3px 6px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:10px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">Call #'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
+    const mainRow='<tr style="'+grpStyle+'">'+callCell+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return'<td style="text-align:center"><span class="badge" style="background:'+col.bg+';color:'+col.tc+'">'+v+'</span></td>';}
       if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return'<td style="text-align:center">'+(raw?raw+(op?'('+op+')':''):'' )+'</td>';}
@@ -1058,7 +1071,7 @@ function renderRaw(){
           <td ${tdS}>${e.PLMN??'-'}</td>
         </tr>`;
       }).join('');
-      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}">
+      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}">
         <div style="padding:10px 14px;background:#f0f6ff;border-top:1px solid #c8daf5">
           <div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:6px">개별 RLF 이벤트 ${evts.length}건 (RLFI 이벤트시간: ${r.Date} ${r.Time})</div>
           <table style="border-collapse:collapse;width:auto">
@@ -1068,10 +1081,10 @@ function renderRaw(){
         </div></td></tr>`;
     } else {
       const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&!k.startsWith('_')&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
-      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+1}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
+      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
     }
     return mainRow+detailRow;
-  }).join(''):`<tr><td colspan="${RAW_FIXED.length+1}" class="no-data">데이터 없음</td></tr>`;
+  }).join(''):`<tr><td colspan="${RAW_FIXED.length+2}" class="no-data">데이터 없음</td></tr>`;
   const total=Math.ceil(rawFiltered.length/RP);
   let btns='';
   for(let p=Math.max(1,rawPage-2);p<=Math.min(total,rawPage+2);p++)
@@ -1080,8 +1093,21 @@ function renderRaw(){
 }
 function rawGo(p){rawPage=p;renderRaw();}
 function exportCSV(){
+  const ACT_MAP_CSV={'2':'3G','4':'LTE','6':'NR'};
+  function cellText(r,c){
+    if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return raw?(raw+(op?'('+op+')':'')):''}
+    if(c==='ACT'){const v=String(r.ACT_??'').trim();const lbl=ACT_MAP_CSV[v];return v?(lbl?v+'('+lbl+')':v):''}
+    if(c==='TAC(HEX)')return String(r.TAC_??'');
+    if(c==='TAC(DEC)'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return isNaN(d)?'':String(d);}
+    if(c==='Band(DLCh)')return getRawBandDLCh(r);
+    if(c==='RSRP')return String(getRawRSRP(r));
+    if(c==='SINR')return String(getRawSINR(r));
+    if(c==='Cause')return getRawCause(r);
+    if(c==='참고')return getRawNote(r);
+    return String(r[c]??'');
+  }
   const esc=v=>`"${String(v??'').replace(/"/g,'""')}"`;
-  const csv=[allCols.join(','),...rawFiltered.map(r=>allCols.map(c=>esc(r[c])).join(','))].join('\n');
+  const csv=[RAW_FIXED.join(','),...rawFiltered.map(r=>RAW_FIXED.map(c=>esc(cellText(r,c))).join(','))].join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
   a.download='log_parsed.csv';a.click();
