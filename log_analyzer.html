@@ -103,6 +103,7 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 .tw{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
 table{border-collapse:collapse;font-size:13px;width:100%}
 thead th{background:var(--blue-800);padding:10px 13px;text-align:left;font-weight:700;font-size:12px;color:rgba(255,255,255,0.92);white-space:nowrap}
+#stHead th,#stBody td{text-align:center}
 tbody tr{border-bottom:1px solid #f1f5f9}
 tbody tr:last-child{border-bottom:none}
 tbody tr:nth-child(even){background:var(--blue-50)}
@@ -256,7 +257,7 @@ const MIC_VAL_DESC={'1':'메인(1st) 마이크 확인필요','2':'상단(2nd) �
 const USER_TYPES=[
   {key:'TXSF',label:'송화음 차단',color:'#16a085',tag:'ttl',desc:'사용자 의도적 송화 차단'},
 ];
-const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'ESM LOWER LAYER FAILURE','273':'LTE NAS SERVICE REQ FAILURE NO THROTTLE','305':'INCORRECT STATE','308':'ESM PROC TIMEOUIT','901':'NO RA FROM NW'};
+const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'ESM LOWER LAYER FAILURE','273':'LTE NAS SERVICE REQ FAILURE NO THROTTLE','305':'INCORRECT STATE','308':'ESM PROC TIMEOUIT','405':'DRB Release by NW','901':'NO RA FROM NW'};
 const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED'};
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
@@ -787,7 +788,8 @@ function renderStationTable(){
   const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th>#</th><th>상태</th><th>TAC(HEX)</th><th>TAC(DEC)</th><th>PCI</th><th>Band</th>${thS('cend','CEND')}${thS('drop','DROP')}${thS('mute','MUTE')}${thS('rlfi','RLF')}${thS('rsrp','avg RSRP')}${thS('sinr','avg SINR')}</tr>`;
+  const thW=(col,label,w)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px">${label}</th>`;
+  document.getElementById('stHead').innerHTML=`<tr><th style="width:32px;min-width:32px">#</th><th style="width:62px;min-width:62px">상태</th><th style="width:72px;min-width:72px">TAC(HEX)</th><th style="width:72px;min-width:72px">TAC(DEC)</th><th style="width:52px;min-width:52px">PCI</th><th style="width:56px;min-width:56px">Band</th>${thW('cend','CEND',52)}${thW('drop','DROP',52)}${thW('mute','MUTE',52)}${thW('rlfi','RLF',52)}${thW('rsrp','avg RSRP',72)}${thW('sinr','avg SINR',72)}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
@@ -865,6 +867,7 @@ function renderTrend(){
 
 function rawChkAll(v){document.querySelectorAll('.feat-chk').forEach(c=>c.checked=v);filterRaw();}
 function rawChkCall(){const call=new Set(['CEND','PSCI','MUTE','DROP']);document.querySelectorAll('.feat-chk').forEach(c=>c.checked=call.has(c.value));filterRaw();}
+function rawChkRegi(){const regi=new Set(['REGI','PDPF','PDPI','ATTS','ATTF','ATTI','MMRJ']);document.querySelectorAll('.feat-chk').forEach(c=>c.checked=regi.has(c.value));filterRaw();}
 function initRaw(){
   const rawRows=buildRawRows();
   const feats=[...new Set(rawRows.map(r=>r.Feature))].sort();
@@ -880,6 +883,7 @@ function initRaw(){
     `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid #27ae60;background:#eafaf1;cursor:pointer;font-weight:600;color:#1e8449" onclick="rawChkAll(true)"><i class="fa-solid fa-circle-check" style="margin-right:3px"></i>전체</button>`+
     `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid #e74c3c;background:#fdecea;cursor:pointer;font-weight:600;color:#c0392b" onclick="rawChkAll(false)"><i class="fa-solid fa-circle-xmark" style="margin-right:3px"></i>전체해제</button>`+
     `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid var(--blue-400);background:var(--blue-50);cursor:pointer;font-weight:600;color:var(--blue-700)" onclick="rawChkCall()"><i class="fa-solid fa-phone" style="margin-right:3px"></i>통화데이터</button>`+
+    `<button style="padding:2px 10px;font-size:11px;border-radius:99px;border:1px solid #d97706;background:#fffbeb;cursor:pointer;font-weight:600;color:#92400e" onclick="rawChkRegi()"><i class="fa-solid fa-tower-cell" style="margin-right:3px"></i>망등록</button>`+
     `</div>`+
     `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px">`+
     feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('')+
@@ -969,21 +973,25 @@ function getRawNote(r){
   }
   if(f==='CEND'){const sec=parseInt(r.CTIM||0,10);if(sec>0){const m=Math.floor(sec/60),s=sec%60;notes.push(`통화시간 : ${m}분 ${s}초`);}}
   if(f==='PSCI'){const fl=String(r.FLCD??'').trim();if(fl)notes.push(fl==='1803'?'캐치콜수신':`FLCD ${fl}`);}
-  if(f==='MIPI'){const mid=r.MID_??'',pid=r.PID_??'';if(mid||pid)notes.push(`MID : ${mid}, PID : ${pid} 확인필요`);}
+  if(f==='MIPI'){const mid=String(r.MID_??'').trim(),pid=String(r.PID_??'').trim();if((mid&&mid!=='0000')||(pid&&pid!=='0000'))notes.push('MID : '+mid+', PID : '+pid+' 확인필요');}
   if(f==='RFPD'){const msg=r.MSG_??'';if(msg)notes.push(String(msg));}
   if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
-  if(f==='SIMD'&&r._simdDiff&&r._simdDiff.length)notes.push(r._simdDiff.join(' · '));
+  if(f==='SIMD'){
+    if(r._simdDiff&&r._simdDiff.length)notes.push(r._simdDiff.join(' · '));
+    const tr1d=parseInt(r.TR1D||0,10);if(tr1d>0)notes.push('TR1D '+tr1d+'회');
+    const ns1d=parseInt(r.NS1D||0,10);if(ns1d>0)notes.push('NS1D '+ns1d+'회');
+  }
   if(f==='TFEI'){const flds=['XO_C','TE_C','FE_C'];const nz=flds.filter(k=>{const v=parseFloat(r[k]??'');return!isNaN(v)&&v!==0;}).map(k=>`${k}:${r[k]}`);if(nz.length)notes.push(nz.join(', '));}
   if(f==='REGI'){const PDTY_MAP={'1':'PDN - Default','2':'PDN - IMS','3':'PDN - Wifi','4':'PDN - Internet','5':'PDN - Emergency'};const pv=String(r.PDTY??'').trim();if(PDTY_MAP[pv])notes.push(PDTY_MAP[pv]);}
   if(f==='REST'){const rsn=String(r.REASON??r.RSN??'').trim();if(rsn)notes.push(rsn);}
   if(f==='RLFC'){const lrlf=parseInt(r.LRLF||0,10);if(lrlf>0)notes.push('RLF '+lrlf+'건 발생(24시간 기준)');}
-  if(f==='SCGC'){const parts=[];const tcnt=parseInt(r.TCNT||0,10);if(tcnt>0)parts.push('Trial '+tcnt+'회');const acnt=parseInt(r.ACNT||0,10);if(acnt>0)parts.push('Add '+acnt+'회');if(parts.length)notes.push(parts.join(', ')+' (24시간 기준)');}
+  if(f==='SCGC'){const parts=[];const tcnt=parseInt(r.TCNT||0,10);if(tcnt>0)parts.push('Trial '+tcnt+'회');const acnt=parseInt(r.ACNT||0,10);if(acnt>0)parts.push('Add '+acnt+'회');if(parts.length)notes.push('SCG '+parts.join(', '));}
   if(f==='NSVC'){const cnt=parseInt(r.CNT_||r.CNT||0,10);if(cnt>0)notes.push('No SVC '+cnt+'회');}
   if(String(r.ACT_??'').trim()==='2')notes.push('3G확인필요');
   return notes.join(' · ');
 }
 const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','Cause','참고'];
-const RAW_COL_W={'Date':88,'Time':72,'Feature':62,'PLMN':105,'ACT':60,'TAC(HEX)':72,'TAC(DEC)':72,'PhID':52,'Band(DLCh)':90,'RSRP':60,'SINR':54,'Cause':160,'참고':150};
+const RAW_COL_W={'Date':82,'Time':66,'Feature':56,'PLMN':96,'ACT':54,'TAC(HEX)':66,'TAC(DEC)':66,'PhID':46,'Band(DLCh)':82,'RSRP':54,'SINR':48,'Cause':150,'참고':190};
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
