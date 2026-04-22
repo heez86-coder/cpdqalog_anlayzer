@@ -110,7 +110,8 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 .tw{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
 #tab-raw .tw{overflow-x:hidden}
 #tab-raw table{table-layout:fixed;width:100%}
-#tab-raw tbody td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#tab-raw tbody td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 6px;font-size:11px}
+#tab-raw thead th{padding:8px 6px;font-size:11px}
 table{border-collapse:collapse;font-size:13px;width:100%}
 thead th{background:var(--blue-800);padding:10px 13px;text-align:left;font-weight:700;font-size:12px;color:rgba(255,255,255,0.92);white-space:nowrap}
 #stHead th,#stBody td{text-align:center}
@@ -799,17 +800,24 @@ function renderStationTable(){
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
   const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
   const thW=(col,label,w)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th style="width:32px;min-width:32px">#</th><th style="width:62px;min-width:62px">상태</th><th style="width:72px;min-width:72px">TAC(HEX)</th><th style="width:72px;min-width:72px">TAC(DEC)</th><th style="width:52px;min-width:52px">PCI</th><th style="width:56px;min-width:56px">Band</th>${thW('cend','CEND',52)}${thW('drop','DROP',52)}${thW('mute','MUTE',52)}${thW('rlfi','RLF',52)}${thW('rsrp','avg RSRP',72)}${thW('sinr','avg SINR',72)}</tr>`;
+  document.getElementById('stHead').innerHTML=`<tr><th style="width:32px;min-width:32px">#</th><th style="width:62px;min-width:62px">상태</th><th style="width:86px;min-width:86px">PLMN</th><th style="width:56px;min-width:56px">ACT</th><th style="width:72px;min-width:72px">TAC(HEX)</th><th style="width:72px;min-width:72px">TAC(DEC)</th><th style="width:52px;min-width:52px">PCI</th><th style="width:56px;min-width:56px">Band</th>${thW('cend','CEND',52)}${thW('drop','DROP',52)}${thW('mute','MUTE',52)}${thW('rlfi','RLF',52)}${thW('rsrp','avg RSRP',72)}${thW('sinr','avg SINR',72)}</tr>`;
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
+    const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
+    const stAllRows=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const plmnRaw=stAllRows.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
+    const actRaw=stAllRows.map(r=>String(r.ACT_??'').trim()).find(a=>a)||'';
+    const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):'';
     const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
+      <td>${plmnDisp}</td><td>${actDisp}</td>
       <td>${s.tac}</td><td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
@@ -818,7 +826,7 @@ function renderStationTable(){
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="12" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="14" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
@@ -1001,7 +1009,7 @@ function getRawNote(r){
   return notes.join(' · ');
 }
 const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','Cause','참고'];
-const RAW_COL_W={'Date':82,'Time':66,'Feature':56,'PLMN':96,'ACT':54,'TAC(HEX)':66,'TAC(DEC)':66,'PhID':46,'Band(DLCh)':82,'RSRP':54,'SINR':48,'Cause':150,'참고':190};
+const RAW_COL_W={'Date':92,'Time':76,'Feature':56,'PLMN':88,'ACT':64,'TAC(HEX)':64,'TAC(DEC)':64,'PhID':44,'Band(DLCh)':78,'RSRP':52,'SINR':50,'Cause':145,'참고':185};
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
