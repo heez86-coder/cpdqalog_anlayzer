@@ -1042,7 +1042,7 @@ function renderRaw(){
     const callNum=r._grpKey?callNums[r._grpKey]:null;
     const gc=callNum?GRP_COLORS[(callNum-1)%GRP_COLORS.length]:null;
     const grpStyle=gc?'background:'+gc.bg+';border-left:3px solid '+gc.bd+';'+(isFirst?'border-top:2px solid '+gc.bd+';':'')+(isLast?'border-bottom:2px solid '+gc.bd+';':''):''
-    const callCell=isFirst&&gc?'<td style="text-align:center;padding:2px 1px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 4px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:9px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">#'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
+    const callCell=isFirst&&gc?'<td style="text-align:center;padding:2px 1px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 4px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:9px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">Call #'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
     const mainRow='<tr style="'+grpStyle+'">'+callCell+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return'<td style="text-align:center"><span class="badge" style="background:'+col.bg+';color:'+col.tc+'">'+v+'</span></td>';}
