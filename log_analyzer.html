@@ -1049,8 +1049,8 @@ function getRawNote(r){
   if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
   if(f==='SIMD'){
     if(r._simdDiff&&r._simdDiff.length)notes.push(r._simdDiff.join(' · '));
-    const tr1d=parseInt(r.TR1D||0,10);if(tr1d>0)notes.push('TR1D '+tr1d+'회');
-    const ns1d=parseInt(r.NS1D||0,10);if(ns1d>0)notes.push('NS1D '+ns1d+'회');
+    const tr1d=parseInt(r.TR1D||0,10);if(tr1d>0)notes.push('Tray Removal '+tr1d+'회(하루 누적)');
+    const ns1d=parseInt(r.NS1D||0,10);if(ns1d>0)notes.push('No SIM '+ns1d+'회(하루 누적)');
   }
   if(f==='TFEI'){const flds=['XO_C','TE_C','FE_C'];const nz=flds.filter(k=>{const v=parseFloat(r[k]??'');return!isNaN(v)&&v!==0;}).map(k=>`${k}:${r[k]}`);if(nz.length)notes.push(nz.join(', '));}
   if(f==='REGI'){const PDTY_MAP={'1':'PDN - Default','2':'PDN - IMS','3':'PDN - Wifi','4':'PDN - Internet','5':'PDN - Emergency'};const pv=String(r.PDTY??'').trim();if(PDTY_MAP[pv])notes.push(PDTY_MAP[pv]);}
