@@ -1052,7 +1052,7 @@ function getRawNote(r){
   }
   if(f==='TFEI'){const flds=['XO_C','TE_C','FE_C'];const nz=flds.filter(k=>{const v=parseFloat(r[k]??'');return!isNaN(v)&&v!==0;}).map(k=>`${k}:${r[k]}`);if(nz.length)notes.push(nz.join(', '));}
   if(f==='REGI'){const PDTY_MAP={'1':'PDN - Default','2':'PDN - IMS','3':'PDN - Wifi','4':'PDN - Internet','5':'PDN - Emergency'};const pv=String(r.PDTY??'').trim();if(PDTY_MAP[pv])notes.push(PDTY_MAP[pv]);}
-  if(f==='REST'){const rsn=String(r.REASON??r.RSN??'').trim();if(rsn)notes.push(rsn);}
+  if(f==='REST'){const rsn=String(r.REASON??r.RSN??'').trim();if(rsn){const REST_SUFFIX={'NP':'POWER ON','RP':'USER RESET','DP':'WATCHDOG','KP':'KERNEL PANIC','SP':'SMPL','WP':'WTSR','MP':'MANUAL RESET','PP':'POWER RESET','BP':'BOOTLOADER RESET','TP':'THERMAL RESET','EX':'Platform Reset_Exception','AR':'Platform Reset_ANR','SF':'Platform Reset_Native Crash (surfaceflinger)','NT':'Platform Reset_Native Crash (system_server)'};const sfx=rsn.slice(-2).toUpperCase();const desc=REST_SUFFIX[sfx];notes.push(desc?rsn+' ('+desc+')':rsn);}}
   if(f==='RLFC'){const lrlf=parseInt(r.LRLF||0,10);if(lrlf>0)notes.push('RLF '+lrlf+'건 발생(24시간 기준)');}
   if(f==='SCGC'){const parts=[];const tcnt=parseInt(r.TCNT||0,10);if(tcnt>0)parts.push('Trial '+tcnt+'회');const acnt=parseInt(r.ACNT||0,10);if(acnt>0)parts.push('Add '+acnt+'회');if(parts.length)notes.push('SCG '+parts.join(', '));}
   if(f==='NSVC'){const cnt=parseInt(r.CNT_||r.CNT||0,10);if(cnt>0)notes.push('No SVC '+cnt+'회');}
