@@ -275,8 +275,8 @@ const MIC_VAL_DESC={'1':'메인(1st) 마이크 확인필요','2':'상단(2nd) �
 const USER_TYPES=[
   {key:'TXSF',label:'송화음 차단',color:'#16a085',tag:'ttl',desc:'사용자 의도적 송화 차단'},
 ];
-const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'ESM LOWER LAYER FAILURE','273':'LTE NAS SERVICE REQ FAILURE NO THROTTLE','305':'INCORRECT STATE','308':'ESM PROC TIMEOUIT','405':'DRB Release by NW','901':'NO RA FROM NW'};
-const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED'};
+const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'ESM LOWER LAYER FAILURE','273':'LTE NAS SERVICE REQ FAILURE NO THROTTLE','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','308':'ESM PROC TIMEOUT','405':'DRB Release by NW','901':'NO RA FROM NW','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
+const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 10:05:33 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-105","RxP1":"-108","SNR0":"-2","SNR1":"-3"}
@@ -806,8 +806,8 @@ function renderStationTable(){
   const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
   const thW=(col,label,w,bg)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px${bg?';background:'+bg:''}">${label}</th>`;
-  const G1='#1f4589',G2='#16455e',G3='#154040';
-  const G1s='#254f99',G2s='#1b506e',G3s='#1a4d4d';
+  const G1='#1a4080',G2='#1a5c3a',G3='#3b1f6e';
+  const G1s='#225099',G2s='#226645',G3s='#4a2880';
   const grpTh=(label,span,bg)=>`<th colspan="${span}" style="background:${bg};font-size:11px;font-weight:700;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,0.18);letter-spacing:.04em">${label}</th>`;
   document.getElementById('stHead').innerHTML=
     '<tr>'
@@ -872,40 +872,40 @@ function renderDaily(){
   document.getElementById('dailyContent').innerHTML=html;
 }
 function renderTrend(){
-  charts.forEach(c=>c.destroy());charts=[];
   const dates=getDates();
-  if(!dates.length){document.getElementById('trendContent').innerHTML='<div class="no-data">데이터 없음</div>';return;}
-  let html='';
-
-  html+='<div class="st">발생률 추이</div><div class="mg">';
+  const dr=[],mr=[],rr=[],cc=[],muteCnt=[],dropCnt=[],rlfCnt=[];
   dates.forEach(d=>{
     const rows=byDate(d);const k=calcKPI(rows);
-    const dropBad=parseFloat(k.dropRate)>1,muteBad=parseFloat(k.muteRate)>1,rlfBad=parseFloat(k.rlfRate)>2;
-    const cls=dropBad?'danger':(muteBad||rlfBad?'warn':'');
-    html+=mCard(d.slice(5),k.dropRate+'%','MUTE '+k.muteRate+'% · RLF '+k.rlfRate+'%',cls);
+    dr.push(parseFloat(k.dropRate));mr.push(parseFloat(k.muteRate));rr.push(parseFloat(k.rlfRate));cc.push(k.total);
+    muteCnt.push(byFeat('MUTE',rows).reduce((s,r)=>s+(fNum(r.ECNT)||0),0));
+    dropCnt.push(byFeat('DROP',rows).length);
+    rlfCnt.push(allRlfEvents.filter(e=>e.Date===d).length);
   });
-  html+='</div>';
-
-  html+='<div class="st">이벤트 카운트</div><div class="mg">';
-  dates.forEach(d=>{
-    const rows=byDate(d);
-    const drop=byFeat('DROP',rows).length;
-    const mute=byFeat('MUTE',rows).length;
-    const rlf=allRlfEvents.filter(e=>e.Date===d).length;
-    const total=drop+mute+rlf;
-    const cls=total>0?'warn':'';
-    html+=mCard(d.slice(5),total+'건','DROP '+drop+' · MUTE '+mute+' · RLF '+rlf,cls);
-  });
-  html+='</div>';
-
-  html+='<div class="st">일별 통화횟수</div><div class="mg">';
-  dates.forEach(d=>{
-    const rows=byDate(d);const k=calcKPI(rows);
-    html+=mCard(d.slice(5),k.total+'건','CEND '+k.total+'건');
-  });
-  html+='</div>';
-
-  document.getElementById('trendContent').innerHTML=html;
+  const labels=dates.map(d=>d.slice(5));
+  const cw=(id,h=200)=>`<div style="position:relative;height:${h}px;background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);padding:18px 12px 10px;box-shadow:var(--shadow-sm)"><canvas id="${id}"></canvas></div>`;
+  document.getElementById('trendContent').innerHTML=
+    `<div class="st">발생률 추이 (%)</div><div style="margin-bottom:22px">${cw('c1',210)}</div>`+
+    `<div class="st">이벤트 카운트</div><div style="margin-bottom:22px">${cw('c3',190)}</div>`+
+    `<div class="st">일별 통화횟수</div>${cw('c2',190)}`;
+  const gc='rgba(100,116,139,0.07)',tf={size:11,family:"'Pretendard',sans-serif",weight:'500'};
+  const ax={ticks:{font:tf,color:'#94a3b8',maxRotation:0},grid:{color:gc},border:{display:false}};
+  const baseOpt={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:{duration:400},plugins:{legend:{display:true,labels:{font:{size:11,family:"'Pretendard',sans-serif",weight:'600'},usePointStyle:true,pointStyleWidth:7,padding:14,boxHeight:5}},tooltip:{backgroundColor:'rgba(15,23,42,0.9)',titleFont:{size:11,weight:'700',family:"'Pretendard',sans-serif"},bodyFont:{size:11,family:"'Pretendard',sans-serif"},padding:10,cornerRadius:8,borderColor:'rgba(100,116,139,0.15)',borderWidth:1}},scales:{x:ax,y:{...ax,ticks:{...ax.ticks}}}};
+  setTimeout(()=>{
+    charts.forEach(c=>c.destroy());charts=[];
+    charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[
+      {label:'Calldrop율',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#e74c3c',pointBorderWidth:2,borderWidth:2,fill:true},
+      {label:'MUTE율',data:mr,borderColor:'#f39c12',backgroundColor:'rgba(243,156,18,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#f39c12',pointBorderWidth:2,borderWidth:2,fill:true},
+      {label:'RLF율',data:rr,borderColor:'#3498db',backgroundColor:'rgba(52,152,219,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#3498db',pointBorderWidth:2,borderWidth:2,fill:true}
+    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,ticks:{...baseOpt.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}}}));
+    charts.push(new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:[
+      {label:'MUTE(ECNT)',data:muteCnt,backgroundColor:'rgba(243,156,18,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'},
+      {label:'DROP',data:dropCnt,backgroundColor:'rgba(231,76,60,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'},
+      {label:'RLF',data:rlfCnt,backgroundColor:'rgba(52,152,219,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'}
+    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,stacked:true}}}}));
+    charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[
+      {label:'통화횟수',data:cc,backgroundColor:'rgba(52,152,219,0.12)',borderColor:'#3498db',borderWidth:1.5,borderRadius:4,borderSkipped:false,categoryPercentage:.6,barPercentage:.85}
+    ]},options:{...baseOpt,plugins:{...baseOpt.plugins,legend:{display:false}}}}));
+  },100);
 }
 
 function rawChkAll(v){document.querySelectorAll('.feat-chk').forEach(c=>c.checked=v);filterRaw();}
