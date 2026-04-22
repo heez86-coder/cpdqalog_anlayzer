@@ -96,6 +96,9 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 
 /* 뱃지/태그 */
 .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700}
+.feat-tip{position:relative;cursor:default}
+.feat-tip[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;font-size:11px;font-weight:400;line-height:1.5;padding:5px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.feat-tip[data-tip]:hover::after{opacity:1}
 .tag{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600}
 .tr{background:var(--red-bg);color:var(--red)}
 .ta{background:var(--orange-bg);color:var(--orange)}
@@ -949,6 +952,7 @@ function filterRaw(){
   });rawPage=1;rawOpenIdx=new Set();renderRaw();
 }
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'}};
+const FEAT_DESC={ATTF:'LTE ATTACH 실패 시',ATTI:'LTE ATTACH 내부 오류 실패 시',ATTS:'LTE ATTACH 성공',CEND:'CALL END EVENT',CRSH:'CP CRASH 발생 시',DAST:'Data Stall 발생 시',DROP:'CALLDROP EVENT',ENST:'ENDC 상태 정보 (24시간마다 1회전송)',INTG:'CP 부팅 시',MIPI:'MIPI 오류',MLPM:'발열제어동작 Trigger/Release',MMRJ:'MM 수행 중 Reject 수신',MUTE:'CALL MUTE EVENT',NSVC:'단말 No SVC / Limited SVC 발생정보 (24시간 동안)',PDPF:'PDP 발신 실패 시',PDPI:'PDP 내부 에러 실패 시',PDPS:'PDP 발생 성공',RFPD:'PAM 문제로 인한 Tx Power 이슈 검출',RLFC:'RLF 및 RRC DCH count (24시간마다)',RLF:'RLF 발생정보 (RLFI Feature 이벤트 개별 적용)',SCGF:'SCG Failure 발생정보',SCGC:'SCG Add, Trial 카운트 (24시간마다)',SIMD:'SIM Detect, No SIM 이벤트 발생정보 (24시간 마다)',SMSI:'SMS 발신 내부오류 실패 시',SMSS:'SMS 발신 성공시',SMSF:'SMS 발신 실패 시',TFEI:'Timing Error / Frequency Error / XO Error 발생 시',UCOF:'UE Capa Info packet overflow 발생',TXDH:'Tx Device Hopping 시간 (24시간 기준)',UCSI:'LTE UE Capa Size로 인한 문제 발생',PSCI:'PS Call 종료시 통화관련 정보',REGI:'Registration Event',NRHT:'발열로 인한 LTE Fallback 이벤트',REST:'단말 재시작 이벤트'};
 function getDropRSRP(r){const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null?(a+b)/2:a;}
 function getDropSINR(r){const a=fNum(r.SNR0),b=fNum(r.SNR1);return a!==null&&b!==null?(a+b)/2:a;}
 function getRawRSRP(r){
@@ -1098,7 +1102,7 @@ function renderRaw(){
     const callCell=isFirst&&gc?'<td style="text-align:center;padding:2px 1px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 4px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:9px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">Call #'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
     const mainRow='<tr style="'+grpStyle+'">'+callCell+RAW_FIXED.map(c=>{
       const v=r[c]??'';
-      if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return'<td style="text-align:center"><span class="badge" style="background:'+col.bg+';color:'+col.tc+'">'+v+'</span></td>';}
+      if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};const tip=FEAT_DESC[v]||'';return'<td style="text-align:center"><span class="badge feat-tip" style="background:'+col.bg+';color:'+col.tc+'"'+(tip?' data-tip="'+tip+'"':'')+'>'+v+'</span></td>';}
       if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return'<td style="text-align:center">'+(raw?raw+(op?'('+op+')':''):'' )+'</td>';}
       if(c==='ACT'){if(r.Feature==='RLF')return'<td style="text-align:center">4(LTE)</td>';const v2=String(r.ACT_??'').trim();const lbl=ACT_MAP[v2];return'<td style="text-align:center">'+(v2?(lbl?v2+'('+lbl+')':v2):'')+'</td>';}
       if(c==='TAC(HEX)')return'<td style="text-align:center">'+(r.TAC_??'')+'</td>';
