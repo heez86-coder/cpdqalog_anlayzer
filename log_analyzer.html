@@ -257,7 +257,8 @@ const DROP_CAUSES={'404':'Not Found','408':'Request Timeout','415':'Unsupported 
 const PLMN_OP={'45005':'SKT','45006':'LGU+','45008':'KT','45010':'공동망'};
 const SCGF_FTYP={'0':'T310 Expiry','1':'randomAccessProblem','2':'RLC MaxNumRetx','3':'SCG_ChangeFailure','4':'SCG_ReconfigFailure','5':'SRB3-IntergrityFailure','6':'BeamRecoveryFailure','B':'Battery','H':'Heat(High Temperature)','L':'Low TP','b':'Battery','h':'Heat(High Temperature)','l':'Low TP'};
 const REGI_CAUSES={'200':'OK','201':'OK_AFTER_FAIL','403':'IMS Regi Fail','708':'TIMEOUT','1009':'EMPTY_PCSCF','1010':'REGI_THROTTLED','1014':'GVN_NOT_READY','1018':'TRY_RCS_CONFIG','1019':'DM_TRIGGERED','1204':'NO_MMTEL_USER_SETTINGS_OFF (사용자 HD Voice OFF)','1210':'NO_MMTEL_3G_PREFFERED_MODE (3G 우선모드 설정)','3002':'PDN_DISCONNECTED','3012':'DEFAULT NW CHANGED','3023':'FLIGHT MODE ON','3024':'RIL_INVOKE','3031':'NETWORK MODE CHANGED','3033':'OUT OF BATTERY','3041':'TEMPORARY FAILURE'};
-const ATTF_CAUSES={'11':'PLMN NOT ALLOWED','19':'ESM_FAILURE'};
+const EMMC_CAUSES={'2':'IMSI UNKNOWN IN HSS','3':'ILLEGAL UE','5':'IMEI NOT ACCEPTED','6':'ILLEGAL ME','7':'EPS SERVICES NOT ALLOWED','8':'EPS SERVICES AND NON EPS SERVICES NOT ALLOWED','9':'UE ID CANNOT BE DERIVED BY NW','10':'IMPLICITLY DETACHED','11':'PLMN NOT ALLOWED','12':'TRACKING AREA NOT ALLOWED','13':'ROAMING NOT ALLOWED IN THIS TRACKING AREA','14':'EPS SERVICES NOT ALLOWED IN PLMN','15':'NO SUITABLE CELLS IN TRACKING AREA','16':'MSC TEMPORARILY NOT REACHABLE','17':'NW FAILURE','18':'CS DOMAIN NOT AVAILABLE','19':'ESM FAILURE','20':'MAC FAILURE','21':'SYNCH FAILURE','22':'CONGESTION','23':'UE SECURITY CAPABILITIES MISMATCH','100':'CONDITIONAL IE ERROR','101':'MSG INCOMPATIBLE WITH PROTOCOL STATE','111':'PROTOCOL ERROR UNSPECIFIED'};
+const ESMC_CAUSES={'8':'TR DETERMINED BARRING','26':'INSUFFICIENT RESOURCES','27':'UNKNOWN MISSING APN','28':'UNKNOWN PDN TYPE','29':'USER AUTHENTICATION FAILED','31':'ACTIVATION REJECTED','36':'REGULAR DEACTIVATION','38':'NETWORK FAILURE','39':'REACTIVATION REQUIRED','40':'FEATURE NOT SUPPORTED','50':'PDN TYPE IPV4 ONLY ALLOWED','51':'PDN TYPE IPV6 ONLY ALLOWED','111':'PROTOCOL ERROR'};
 const MMRJ_CAUSES={'1':'AUTHENTICATION REJECT','2':'IMSI Unknown in HSS','3':'ILLEGAL UE/MS','6':'ILLEGAL ME','8':'EPS Services and non-EPS Services not allowed'};
 const MIC_TYPES=[
   {key:'SAMS',label:'대체 마이크 스위칭',color:'#c0392b',tag:'tpk',desc:'마이크 비정상 → 대체 동작'},
@@ -965,7 +966,13 @@ function getRawCause(r){
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPF_ENDR[v]||'')):''}
   if(f==='PDPI'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPI_ENDR[v]||'')):''};
-  if(f==='ATTF'||f==='ATTI'){const v=String(r.EMMC??r.ESMC??'').trim();return(v&&v!=='0')?`${v} : ${ATTF_CAUSES[v]||''}`:'';}
+  if(f==='ATTF'||f==='ATTI'){
+    const emmc=String(r.EMMC??'').trim(),esmc=String(r.ESMC??'').trim();
+    const parts=[];
+    if(emmc&&emmc!=='0')parts.push('EMMC '+emmc+(EMMC_CAUSES[emmc]?' : '+EMMC_CAUSES[emmc]:''));
+    if(esmc&&esmc!=='0')parts.push('ESMC '+esmc+(ESMC_CAUSES[esmc]?' : '+ESMC_CAUSES[esmc]:''));
+    return parts.join(' / ');
+  }
   if(f==='MMRJ'){const v=String(r.RJCU??'').trim();return v?`${v} : ${MMRJ_CAUSES[v]||'Unknown'}`:''}
   return'';
 }
