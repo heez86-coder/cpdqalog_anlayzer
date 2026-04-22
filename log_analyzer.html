@@ -962,6 +962,7 @@ function buildRawRows(){
       rows.push(r);
     }
   });
+  rows.sort((a,b)=>{const da=a.Date+a.Time,db=b.Date+b.Time;return da<db?-1:da>db?1:0;});
   const GROUP_FEATS=new Set(['MUTE','CEND','DROP','PSCI']);
   const toSec=r=>{
     if(r._sec!=null)return r._sec;
@@ -1046,7 +1047,7 @@ function renderRaw(){
     {bg:'#fef9c3',bd:'#ca8a04',lbl:'#92400e'},
   ];
   const callNums={};let callCtr=0;
-  rawFiltered.forEach(r=>{if(r._grpKey&&!callNums[r._grpKey])callNums[r._grpKey]=++callCtr;});
+  buildRawRows().forEach(r=>{if(r._grpKey&&!callNums[r._grpKey])callNums[r._grpKey]=++callCtr;});
   document.getElementById('rawHead').innerHTML='<tr><th style="width:52px;text-align:center">Call</th>'+RAW_FIXED.map(c=>'<th style="width:'+(RAW_COL_W[c]||70)+'px;text-align:center">'+c+'</th>').join('')+'<th style="width:32px"></th></tr>';
   document.getElementById('rawBody').innerHTML=page.length?page.map((r,i)=>{
     const gi=start+i;
@@ -1112,8 +1113,11 @@ function renderRaw(){
   }).join(''):`<tr><td colspan="${RAW_FIXED.length+2}" class="no-data">데이터 없음</td></tr>`;
   const total=Math.ceil(rawFiltered.length/RP);
   let btns='';
+  const btnStyle='padding:5px 10px;font-size:12px;margin:0 2px';
+  if(rawPage>1)btns+=`<button class="btn" style="${btnStyle}" onclick="rawGo(1)">«</button>`;
   for(let p=Math.max(1,rawPage-2);p<=Math.min(total,rawPage+2);p++)
-    btns+=`<button class="btn${p===rawPage?' btn-p':''}" style="padding:5px 11px;font-size:12px;margin:0 2px" onclick="rawGo(${p})">${p}</button>`;
+    btns+=`<button class="btn${p===rawPage?' btn-p':''}" style="${btnStyle}" onclick="rawGo(${p})">${p}</button>`;
+  if(rawPage<total)btns+=`<button class="btn" style="${btnStyle}" onclick="rawGo(${total})">»</button>`;
   document.getElementById('rawPager').innerHTML=`<span>${rawFiltered.length}건 / 전체 ${buildRawRows().length}건</span><div>${btns}</div>`;
 }
 function rawGo(p){rawPage=p;renderRaw();}
