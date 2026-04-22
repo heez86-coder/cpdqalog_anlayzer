@@ -115,6 +115,12 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 table{border-collapse:collapse;font-size:13px;width:100%}
 thead th{background:var(--blue-800);padding:10px 13px;text-align:left;font-weight:700;font-size:12px;color:rgba(255,255,255,0.92);white-space:nowrap}
 #stHead th,#stBody td{text-align:center}
+#stBody td:nth-child(n+3):nth-child(-n+8){background:rgba(37,79,153,0.04)}
+#stBody td:nth-child(n+9):nth-child(-n+12){background:rgba(22,69,94,0.05)}
+#stBody td:nth-child(n+13){background:rgba(21,64,64,0.05)}
+#stBody tr:nth-child(even) td:nth-child(n+3):nth-child(-n+8){background:rgba(37,79,153,0.09)}
+#stBody tr:nth-child(even) td:nth-child(n+9):nth-child(-n+12){background:rgba(22,69,94,0.10)}
+#stBody tr:nth-child(even) td:nth-child(n+13){background:rgba(21,64,64,0.10)}
 tbody tr{border-bottom:1px solid #f1f5f9}
 tbody tr:last-child{border-bottom:none}
 tbody tr:nth-child(even){background:var(--blue-50)}
@@ -233,7 +239,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
         <input type="date" id="rawDateFrom" onchange="filterRaw()" title="시작일">
         <span style="color:var(--text-secondary);font-size:12px">~</span>
         <input type="date" id="rawDateTo" onchange="filterRaw()" title="종료일">
-        <button class="btn" onclick="exportCSV()">CSV 내보내기</button>
+        <button class="btn" onclick="exportCSV()">CSV로 저장</button>
       </div>
       <div id="rawFeatChk" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:var(--blue-50);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px"></div>
       <div class="tw"><table><thead id="rawHead"></thead><tbody id="rawBody"></tbody></table></div>
@@ -799,25 +805,27 @@ function renderStationTable(){
   }
   const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
-  const thW=(col,label,w)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px">${label}</th>`;
-  const grpTh=(label,span)=>`<th colspan="${span}" style="background:var(--blue-700);font-size:11px;font-weight:700;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,0.18);letter-spacing:.04em">${label}</th>`;
+  const thW=(col,label,w,bg)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px${bg?';background:'+bg:''}">${label}</th>`;
+  const G1='#1f4589',G2='#16455e',G3='#154040';
+  const G1s='#254f99',G2s='#1b506e',G3s='#1a4d4d';
+  const grpTh=(label,span,bg)=>`<th colspan="${span}" style="background:${bg};font-size:11px;font-weight:700;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,0.18);letter-spacing:.04em">${label}</th>`;
   document.getElementById('stHead').innerHTML=
     '<tr>'
-    +'<th rowspan="2" style="width:32px;min-width:32px">#</th>'
-    +'<th rowspan="2" style="width:62px;min-width:62px">상태</th>'
-    +grpTh('기지국 정보',6)
-    +grpTh('발생 이벤트',4)
-    +grpTh('전계 정보(평균)',2)
+    +'<th rowspan="2" style="width:32px;min-width:32px;background:var(--blue-800)">#</th>'
+    +'<th rowspan="2" style="width:62px;min-width:62px;background:var(--blue-800)">상태</th>'
+    +grpTh('기지국 정보',6,G1)
+    +grpTh('발생 이벤트',4,G2)
+    +grpTh('전계 정보(평균)',2,G3)
     +'</tr>'
     +'<tr>'
-    +'<th style="width:86px;min-width:86px">PLMN</th>'
-    +'<th style="width:56px;min-width:56px">ACT</th>'
-    +'<th style="width:72px;min-width:72px">TAC(HEX)</th>'
-    +'<th style="width:72px;min-width:72px">TAC(DEC)</th>'
-    +'<th style="width:52px;min-width:52px">PCI</th>'
-    +'<th style="width:56px;min-width:56px">Band</th>'
-    +thW('cend','CEND',52)+thW('drop','DROP',52)+thW('mute','MUTE',52)+thW('rlfi','RLF',52)
-    +thW('rsrp','RSRP',72)+thW('sinr','SINR',72)
+    +`<th style="width:86px;min-width:86px;background:${G1s}">PLMN</th>`
+    +`<th style="width:56px;min-width:56px;background:${G1s}">ACT</th>`
+    +`<th style="width:72px;min-width:72px;background:${G1s}">TAC(HEX)</th>`
+    +`<th style="width:72px;min-width:72px;background:${G1s}">TAC(DEC)</th>`
+    +`<th style="width:52px;min-width:52px;background:${G1s}">PCI</th>`
+    +`<th style="width:56px;min-width:56px;background:${G1s}">Band</th>`
+    +thW('cend','CEND',52,G2s)+thW('drop','DROP',52,G2s)+thW('mute','MUTE',52,G2s)+thW('rlfi','RLF',52,G2s)
+    +thW('rsrp','RSRP',72,G3s)+thW('sinr','SINR',72,G3s)
     +'</tr>';
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
@@ -1015,7 +1023,7 @@ function getRawBandDLCh(r){
   if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?String(b):''}
   if(r.Feature==='SCGF'){
     const lte=r.MBnd??r.LBnd??'';const nr=r.SBnd??r.NBnd??'';
-    const parts=[];if(lte)parts.push(`${lte}(LTE)`);if(nr)parts.push(`${nr}(NR)`);
+    const parts=[];if(lte)parts.push('B'+lte);if(nr)parts.push('n'+nr);
     return parts.join(' - ');
   }
   const dch=r.DLCh??'';if(!dch)return'';
@@ -1090,7 +1098,7 @@ function renderRaw(){
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return'<td style="text-align:center"><span class="badge" style="background:'+col.bg+';color:'+col.tc+'">'+v+'</span></td>';}
       if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return'<td style="text-align:center">'+(raw?raw+(op?'('+op+')':''):'' )+'</td>';}
-      if(c==='ACT'){const v2=String(r.ACT_??'').trim();const lbl=ACT_MAP[v2];return'<td style="text-align:center">'+(v2?(lbl?v2+'('+lbl+')':v2):'')+'</td>';}
+      if(c==='ACT'){if(r.Feature==='RLF')return'<td style="text-align:center">4(LTE)</td>';const v2=String(r.ACT_??'').trim();const lbl=ACT_MAP[v2];return'<td style="text-align:center">'+(v2?(lbl?v2+'('+lbl+')':v2):'')+'</td>';}
       if(c==='TAC(HEX)')return'<td style="text-align:center">'+(r.TAC_??'')+'</td>';
       if(c==='TAC(DEC)'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return'<td style="text-align:center">'+(isNaN(d)?'':d)+'</td>';}
       if(c==='Band(DLCh)')return'<td style="text-align:center">'+getRawBandDLCh(r)+'</td>';
