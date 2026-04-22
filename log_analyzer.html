@@ -798,9 +798,26 @@ function renderStationTable(){
   }
   const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
   const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
-  const thS=(col,label)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')">${label}</th>`;
   const thW=(col,label,w)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px">${label}</th>`;
-  document.getElementById('stHead').innerHTML=`<tr><th style="width:32px;min-width:32px">#</th><th style="width:62px;min-width:62px">상태</th><th style="width:86px;min-width:86px">PLMN</th><th style="width:56px;min-width:56px">ACT</th><th style="width:72px;min-width:72px">TAC(HEX)</th><th style="width:72px;min-width:72px">TAC(DEC)</th><th style="width:52px;min-width:52px">PCI</th><th style="width:56px;min-width:56px">Band</th>${thW('cend','CEND',52)}${thW('drop','DROP',52)}${thW('mute','MUTE',52)}${thW('rlfi','RLF',52)}${thW('rsrp','avg RSRP',72)}${thW('sinr','avg SINR',72)}</tr>`;
+  const grpTh=(label,span)=>`<th colspan="${span}" style="background:var(--blue-700);font-size:11px;font-weight:700;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,0.18);letter-spacing:.04em">${label}</th>`;
+  document.getElementById('stHead').innerHTML=
+    '<tr>'
+    +'<th rowspan="2" style="width:32px;min-width:32px">#</th>'
+    +'<th rowspan="2" style="width:62px;min-width:62px">상태</th>'
+    +grpTh('기지국 정보',6)
+    +grpTh('발생 이벤트',4)
+    +grpTh('전계 정보(평균)',2)
+    +'</tr>'
+    +'<tr>'
+    +'<th style="width:86px;min-width:86px">PLMN</th>'
+    +'<th style="width:56px;min-width:56px">ACT</th>'
+    +'<th style="width:72px;min-width:72px">TAC(HEX)</th>'
+    +'<th style="width:72px;min-width:72px">TAC(DEC)</th>'
+    +'<th style="width:52px;min-width:52px">PCI</th>'
+    +'<th style="width:56px;min-width:56px">Band</th>'
+    +thW('cend','CEND',52)+thW('drop','DROP',52)+thW('mute','MUTE',52)+thW('rlfi','RLF',52)
+    +thW('rsrp','RSRP',72)+thW('sinr','SINR',72)
+    +'</tr>';
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
     const rkCls=rk<=3?`r${rk}`:'';
@@ -810,7 +827,7 @@ function renderStationTable(){
     const plmnRaw=stAllRows.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
     const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
     const actRaw=stAllRows.map(r=>String(r.ACT_??'').trim()).find(a=>a)||'';
-    const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):'';
+    const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):(s.rlfis.length>0&&s.drops.length===0&&s.mutes.length===0&&s.cends.length===0?'LTE':'');
     const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
