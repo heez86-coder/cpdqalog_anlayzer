@@ -963,9 +963,26 @@ function buildRawRows(){
     }
   });
   const GROUP_FEATS=new Set(['MUTE','CEND','DROP','PSCI']);
-  const timeCounts={};
-  rows.forEach(r=>{if(GROUP_FEATS.has(r.Feature)){const k=r.Date+'|'+r.Time;timeCounts[k]=(timeCounts[k]||0)+1;}});
-  rows.forEach(r=>{r._grpKey=(GROUP_FEATS.has(r.Feature)&&timeCounts[r.Date+'|'+r.Time]>1)?r.Date+'|'+r.Time:null;});
+  const toSec=r=>{
+    if(r._sec!=null)return r._sec;
+    const t=new Date(r.Date+'T'+r.Time);
+    r._sec=isNaN(t.getTime())?0:Math.floor(t.getTime()/1000);
+    return r._sec;
+  };
+  rows.forEach(r=>r._grpKey=null);
+  const grpRows=rows.filter(r=>GROUP_FEATS.has(r.Feature));
+  grpRows.sort((a,b)=>toSec(a)-toSec(b));
+  if(grpRows.length>0){
+    let gid=0;
+    grpRows[0]._grpIdx=0;
+    for(let i=1;i<grpRows.length;i++){
+      if(toSec(grpRows[i])-toSec(grpRows[i-1])<=2)grpRows[i]._grpIdx=gid;
+      else grpRows[i]._grpIdx=++gid;
+    }
+    const gcnt={};
+    grpRows.forEach(r=>gcnt[r._grpIdx]=(gcnt[r._grpIdx]||0)+1);
+    grpRows.forEach(r=>{r._grpKey=gcnt[r._grpIdx]>1?('grp'+r._grpIdx):null;});
+  }
   return rows;
 }
 const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
