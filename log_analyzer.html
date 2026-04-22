@@ -872,41 +872,40 @@ function renderDaily(){
   document.getElementById('dailyContent').innerHTML=html;
 }
 function renderTrend(){
+  charts.forEach(c=>c.destroy());charts=[];
   const dates=getDates();
-  const dr=[],mr=[],rr=[],cc=[],muteCnt=[],dropCnt=[],rlfCnt=[];
+  if(!dates.length){document.getElementById('trendContent').innerHTML='<div class="no-data">데이터 없음</div>';return;}
+  let html='';
+
+  html+='<div class="st">발생률 추이</div><div class="mg">';
   dates.forEach(d=>{
     const rows=byDate(d);const k=calcKPI(rows);
-    dr.push(parseFloat(k.dropRate));mr.push(parseFloat(k.muteRate));rr.push(parseFloat(k.rlfRate));cc.push(k.total);
-    muteCnt.push(byFeat('MUTE',rows).reduce((s,r)=>s+(fNum(r.ECNT)||0),0));
-    dropCnt.push(byFeat('DROP',rows).length);
-    rlfCnt.push(allRlfEvents.filter(e=>e.Date===d).length);
+    const dropBad=parseFloat(k.dropRate)>1,muteBad=parseFloat(k.muteRate)>1,rlfBad=parseFloat(k.rlfRate)>2;
+    const cls=dropBad?'danger':(muteBad||rlfBad?'warn':'');
+    html+=mCard(d.slice(5),k.dropRate+'%','MUTE '+k.muteRate+'% · RLF '+k.rlfRate+'%',cls);
   });
-  const labels=dates.map(d=>d.slice(5));
-  const cw=(id,h=200)=>`<div style="position:relative;height:${h}px;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:18px 12px 10px"><canvas id="${id}"></canvas></div>`;
-  const lbl=(t)=>`<div style="font-size:11px;font-weight:700;color:var(--text-secondary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">${t}</div>`;
-  document.getElementById('trendContent').innerHTML=
-    `<div style="margin-bottom:18px">${lbl('발생률 추이 (%)')}${cw('c1',210)}</div>`+
-    `<div style="margin-bottom:18px">${lbl('이벤트 카운트')}${cw('c3',190)}</div>`+
-    `<div>${lbl('일별 통화횟수')}${cw('c2',190)}</div>`;
-  const gc='rgba(100,116,139,0.07)',tf={size:11,family:"'Pretendard',sans-serif",weight:'500'};
-  const ax={ticks:{font:tf,color:'#94a3b8',maxRotation:0},grid:{color:gc},border:{display:false}};
-  const baseOpt={responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},animation:{duration:400},plugins:{legend:{display:true,labels:{font:{size:11,family:"'Pretendard',sans-serif",weight:'600'},usePointStyle:true,pointStyleWidth:7,padding:14,boxHeight:5}},tooltip:{backgroundColor:'rgba(15,23,42,0.9)',titleFont:{size:11,weight:'700',family:"'Pretendard',sans-serif"},bodyFont:{size:11,family:"'Pretendard',sans-serif"},padding:10,cornerRadius:8,borderColor:'rgba(100,116,139,0.15)',borderWidth:1}},scales:{x:ax,y:{...ax,ticks:{...ax.ticks}}}};
-  setTimeout(()=>{
-    charts.forEach(c=>c.destroy());charts=[];
-    charts.push(new Chart(document.getElementById('c1'),{type:'line',data:{labels,datasets:[
-      {label:'Calldrop율',data:dr,borderColor:'#e74c3c',backgroundColor:'rgba(231,76,60,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#e74c3c',pointBorderWidth:2,borderWidth:2,fill:true},
-      {label:'MUTE율',data:mr,borderColor:'#f39c12',backgroundColor:'rgba(243,156,18,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#f39c12',pointBorderWidth:2,borderWidth:2,fill:true},
-      {label:'RLF율',data:rr,borderColor:'#3498db',backgroundColor:'rgba(52,152,219,0.05)',tension:.4,pointRadius:3,pointHoverRadius:6,pointBackgroundColor:'#fff',pointBorderColor:'#3498db',pointBorderWidth:2,borderWidth:2,fill:true}
-    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,ticks:{...baseOpt.scales.y.ticks,callback:v=>v.toFixed(1)+'%'}}}}}));
-    charts.push(new Chart(document.getElementById('c3'),{type:'bar',data:{labels,datasets:[
-      {label:'MUTE(ECNT)',data:muteCnt,backgroundColor:'rgba(243,156,18,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'},
-      {label:'DROP',data:dropCnt,backgroundColor:'rgba(231,76,60,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'},
-      {label:'RLF',data:rlfCnt,backgroundColor:'rgba(52,152,219,0.7)',borderRadius:3,borderSkipped:false,categoryPercentage:.65,barPercentage:.9,stack:'ev'}
-    ]},options:{...baseOpt,scales:{...baseOpt.scales,y:{...baseOpt.scales.y,stacked:true}}}}));
-    charts.push(new Chart(document.getElementById('c2'),{type:'bar',data:{labels,datasets:[
-      {label:'통화횟수',data:cc,backgroundColor:'rgba(52,152,219,0.12)',borderColor:'#3498db',borderWidth:1.5,borderRadius:4,borderSkipped:false,categoryPercentage:.6,barPercentage:.85}
-    ]},options:{...baseOpt,plugins:{...baseOpt.plugins,legend:{display:false}}}}));
-  },100);
+  html+='</div>';
+
+  html+='<div class="st">이벤트 카운트</div><div class="mg">';
+  dates.forEach(d=>{
+    const rows=byDate(d);
+    const drop=byFeat('DROP',rows).length;
+    const mute=byFeat('MUTE',rows).length;
+    const rlf=allRlfEvents.filter(e=>e.Date===d).length;
+    const total=drop+mute+rlf;
+    const cls=total>0?'warn':'';
+    html+=mCard(d.slice(5),total+'건','DROP '+drop+' · MUTE '+mute+' · RLF '+rlf,cls);
+  });
+  html+='</div>';
+
+  html+='<div class="st">일별 통화횟수</div><div class="mg">';
+  dates.forEach(d=>{
+    const rows=byDate(d);const k=calcKPI(rows);
+    html+=mCard(d.slice(5),k.total+'건','CEND '+k.total+'건');
+  });
+  html+='</div>';
+
+  document.getElementById('trendContent').innerHTML=html;
 }
 
 function rawChkAll(v){document.querySelectorAll('.feat-chk').forEach(c=>c.checked=v);filterRaw();}
