@@ -539,7 +539,7 @@ function renderHeader(filename){
   cl.innerHTML=lines.join('<br>');cl.style.display='block';
 }
 function annotateSIMD(){
-  const EXCL=new Set(['Date','Time','Feature']);
+  const EXCL=new Set(['Date','Time','Feature','TR1D','NS1D']);
   const dates=getDates();
   let prevSnap=null;
   dates.forEach(d=>{
