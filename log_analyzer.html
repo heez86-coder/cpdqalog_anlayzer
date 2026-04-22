@@ -245,7 +245,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 
 <script>
 let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
-const RP=20;let charts=[];
+const RP=50;let charts=[];
 const SOUND_TYPES=[
   {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김',cat:'rx'},
   {key:'RNMT',label:'RxNodata Mute',color:'#2980b9',tag:'tb',desc:'수신 데이터 없음',cat:'rx'},
@@ -906,7 +906,7 @@ function initRaw(){
     `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px">`+
     feats.map(f=>`<label style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;padding:2px 8px;background:var(--surface);border:1px solid var(--border);border-radius:99px;white-space:nowrap"><input type="checkbox" checked class="feat-chk" value="${f}" onchange="filterRaw()"> ${f}</label>`).join('')+
     `</div>`;
-  rawFiltered=[...rawRows];rawPage=1;renderRaw();
+  rawFiltered=[...rawRows];rawPage=Math.max(1,Math.ceil(rawFiltered.length/RP));renderRaw();
 }
 function filterRaw(){
   const q=document.getElementById('rawSearch').value.toLowerCase();
@@ -1042,7 +1042,7 @@ function renderRaw(){
     const callNum=r._grpKey?callNums[r._grpKey]:null;
     const gc=callNum?GRP_COLORS[(callNum-1)%GRP_COLORS.length]:null;
     const grpStyle=gc?'background:'+gc.bg+';border-left:3px solid '+gc.bd+';'+(isFirst?'border-top:2px solid '+gc.bd+';':'')+(isLast?'border-bottom:2px solid '+gc.bd+';':''):''
-    const callCell=isFirst&&gc?'<td style="text-align:center;padding:4px 2px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:3px 6px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:10px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">Call #'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
+    const callCell=isFirst&&gc?'<td style="text-align:center;padding:2px 1px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 4px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:9px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">#'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
     const mainRow='<tr style="'+grpStyle+'">'+callCell+RAW_FIXED.map(c=>{
       const v=r[c]??'';
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};return'<td style="text-align:center"><span class="badge" style="background:'+col.bg+';color:'+col.tc+'">'+v+'</span></td>';}
