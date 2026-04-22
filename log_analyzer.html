@@ -962,10 +962,11 @@ function getRawCause(r){
   if(f==='DROP'){const c=String(r.SIPR||'').trim();return c?`${c} : ${DROP_CAUSES[c]||'Unknown'}`:''}
   if(f==='MUTE'){
     const parts=[];
-    const binKeys=['RSMT','RNMT','DBMT','UBMT','SMBU','TXMT','TXSF'];
+    const binKeys=['RSMT','RNMT','DBMT','UBMT','TXMT','TXSF'];
     binKeys.forEach(k=>{if(r[k]==='1'||r[k]===1)parts.push(k);});
-    const samsV=parseInt(r.SAMS||0,10);if(samsV>0)parts.push('SAMS '+samsV+' ('+(MIC_VAL_DESC[String(samsV)]||'')+')');
-    const mcstV=parseInt(r.MCST||0,10);if(mcstV>0)parts.push('MCST '+mcstV+' ('+(MIC_VAL_DESC[String(mcstV)]||'')+')');
+    if(r.SMBU==='1'||r.SMBU===1)parts.push('SMBU : 1');
+    const samsV=parseInt(r.SAMS||0,10);if(samsV>0)parts.push('SAMS : '+samsV);
+    const mcstV=parseInt(r.MCST||0,10);if(mcstV>0)parts.push('MCST : '+mcstV);
     return parts.join(', ');
   }
   if(f==='SCGF'){const v=String(r.Ftyp??'').trim();if(!v)return'';if(v==='N')return'N';return v+' : '+(SCGF_FTYP[v]||'Unknown');}
@@ -1033,7 +1034,7 @@ function getRawNote(r){
   const f=r.Feature;
   const PATH_MAP={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
   const notes=[];
-  if(f==='MUTE'){const p=String(r.PATH??'').trim();if(PATH_MAP[p])notes.push(PATH_MAP[p]);const ec=parseInt(r.ECNT||0,10);if(ec>=10)notes.push(`ECNT ${ec}회`);const samsV=parseInt(r.SAMS||0,10);if(samsV>0)notes.push('SAMS '+samsV+' 발생');const mcstV=parseInt(r.MCST||0,10);if(mcstV>0)notes.push('MCST '+mcstV+' 발생');if(r.SMBU==='1'||r.SMBU===1)notes.push('SMBU 발생');}
+  if(f==='MUTE'){const p=String(r.PATH??'').trim();if(PATH_MAP[p])notes.push(PATH_MAP[p]);const ec=parseInt(r.ECNT||0,10);if(ec>=10)notes.push(`ECNT ${ec}회`);const samsV=parseInt(r.SAMS||0,10);if(samsV>0)notes.push(MIC_VAL_DESC[String(samsV)]||'SAMS '+samsV);const mcstV=parseInt(r.MCST||0,10);if(mcstV>0)notes.push(MIC_VAL_DESC[String(mcstV)]||'MCST '+mcstV);if(r.SMBU==='1'||r.SMBU===1)notes.push('마이크 구멍 막힘');}
   if(f==='CEND'||f==='DROP'){
     const a=String(r.AUST??'').trim();if(PATH_MAP[a])notes.push(PATH_MAP[a]);
     const ct=String(r.Ctyp??'').trim();if(ct==='5')notes.push('Video call');else if(ct==='6')notes.push('Emergency call');
