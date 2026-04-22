@@ -969,7 +969,7 @@ function getRawCause(r){
   if(f==='ATTF'||f==='ATTI'){
     const emmc=String(r.EMMC??'').trim(),esmc=String(r.ESMC??'').trim();
     const parts=[];
-    if(emmc&&emmc!=='0')parts.push('EMMC '+emmc+(EMMC_CAUSES[emmc]?' : '+EMMC_CAUSES[emmc]:''));
+    if(emmc&&emmc!=='0'&&emmc!=='255')parts.push('EMMC '+emmc+(EMMC_CAUSES[emmc]?' : '+EMMC_CAUSES[emmc]:''));
     if(esmc&&esmc!=='0')parts.push('ESMC '+esmc+(ESMC_CAUSES[esmc]?' : '+ESMC_CAUSES[esmc]:''));
     return parts.join(' / ');
   }
