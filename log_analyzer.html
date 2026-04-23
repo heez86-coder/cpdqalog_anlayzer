@@ -229,13 +229,11 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
           <option value="warning">주의</option><option value="weak">양호</option>
           <option value="antdiff">Ant Diff</option><option value="normal">정상</option>
         </select>
+        <button class="btn" onclick="exportTop3Stations('csv')" title="상위 3개 기지국 CSV 저장"><i class="fa fa-download"></i> CSV 저장</button>
+        <button class="btn" onclick="exportTop3Stations('copy')" title="상위 3개 기지국 클립보드 복사"><i class="fa fa-copy"></i> 클립보드 복사</button>
       </div>
       <div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
-        <span style="font-size:12px;color:#aaa" id="stCount"></span>
-        <button class="btn" onclick="exportTop3Stations('csv')" title="상위 3개 기지국 CSV 저장"><i class="fa fa-download"></i> Top3 CSV</button>
-        <button class="btn" onclick="exportTop3Stations('copy')" title="상위 3개 기지국 클립보드 복사"><i class="fa fa-copy"></i> Top3 복사</button>
-      </div>
+      <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
     </div>
     <div id="tab-mute" style="display:none"><div id="muteContent"></div></div>
     <div id="tab-drop" style="display:none"><div id="dropContent"></div></div>
@@ -849,7 +847,7 @@ function renderDropTab(){
         +'<td>'+(r.PhID??'')+'</td><td>'+(r.DLCh??'')+'</td>'
         +'<td style="font-size:11px">'+siprCell+'</td>'
         +'<td>'+adCell+'</td>'
-        +'<td style="font-size:11px;color:var(--teal);white-space:normal;min-width:100px">'+noteCell+'</td></tr>';
+        +'<td style="font-size:11px;color:#fff;white-space:normal;min-width:100px">'+noteCell+'</td></tr>';
     }).join('');
     html+='<div class="day-card">'
       +'<div class="day-hdr"><span class="day-dt">'+d+'</span>'
