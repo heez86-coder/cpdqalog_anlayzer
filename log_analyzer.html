@@ -563,10 +563,10 @@ function buildStationMap(){
     s.isWeak=s.weakRsrp||s.weakSinr;
     s.hasAntDiff=s.antDiffDrops.length>=2;
     s.score=s.drops.length*10+s.nonMicMutes.length*2+s.rlfis.length;
-    if(s.probCount>=3)s.level='issue';
-    else if(s.weakRsrp)s.level='weak_sig';
+    if(s.weakRsrp)s.level='weak_sig';
     else if(s.weakSinr)s.level='inter';
     else if(s.avgBler!==null&&s.avgBler>=40)s.level='high_bler';
+    else if(s.probCount>=3)s.level='issue';
     else s.level='normal';
   });
 }
@@ -880,14 +880,14 @@ function renderDropTab(){
       const adRow=fNum(r.RxP0)!==null&&fNum(r.RxP1)!==null&&Math.abs(fNum(r.RxP0)-fNum(r.RxP1))>=20;
       const siprCell=sipr?'<span style="font-weight:600;color:var(--red)">'+sipr+'</span> '+(DROP_CAUSES[sipr]||'Unknown'):'';
       const adCell=adRow?'<span class="badge ttl" style="font-size:10px">Ant Diff</span>':'';
-      const noteCell=getRawNote(r);
+      const noteRaw=getRawNote(r);const noteCell=noteRaw.split(' · ').join('<br>');
       return'<tr'+(adRow?' style="background:#fff8f8"':'')+'>'
         +'<td>'+r.Time+'</td><td>'+plmnFmt(r.PLMN)+'</td>'
         +'<td>'+(r.TAC_??'')+'</td><td>'+(isNaN(tacDec)?'':tacDec)+'</td>'
         +'<td>'+(r.PhID??'')+'</td><td>'+(r.DLCh??'')+'</td>'
         +'<td style="font-size:11px">'+siprCell+'</td>'
         +'<td>'+adCell+'</td>'
-        +'<td style="font-size:11px;color:#fff;white-space:normal;min-width:100px">'+noteCell+'</td></tr>';
+        +'<td style="font-size:11px;color:var(--teal);white-space:normal;min-width:100px;line-height:1.6">'+noteCell+'</td></tr>';
     }).join('');
     html+='<div class="day-card">'
       +'<div class="day-hdr"><span class="day-dt">'+d+'</span>'
