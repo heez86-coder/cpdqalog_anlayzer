@@ -88,8 +88,8 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 
 /* 알림 카드 */
 .nc{border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:10px;background:var(--surface);box-shadow:var(--shadow-sm)}
-.nc.critical{border-left:4px solid var(--red)}.nc.warning{border-left:4px solid var(--orange)}
-.nc.weak{border-left:4px solid var(--purple)}.nc.antdiff{border-left:4px solid #16a085}.nc.mic{border-left:4px solid var(--red)}
+.nc.issue{border-left:4px solid var(--red)}.nc.weak_sig{border-left:4px solid var(--orange)}
+.nc.inter{border-left:4px solid var(--purple)}.nc.high_bler{border-left:4px solid var(--blue-700)}.nc.antdiff{border-left:4px solid #16a085}.nc.mic{border-left:4px solid var(--red)}
 .nt{font-size:13px;font-weight:700;color:var(--text-primary)}
 .ns{font-size:12px;color:var(--text-secondary);margin-top:5px;font-weight:500}
 .ntags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -226,9 +226,10 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
         <input type="text" id="stPci" placeholder="PCI" oninput="renderStationTable()" style="width:90px">
         <input type="text" id="stBand" placeholder="Band" oninput="renderStationTable()" style="width:90px">
         <select id="stFilter" onchange="renderStationTable()">
-          <option value="">전체</option><option value="critical">불량</option>
-          <option value="warning">주의</option><option value="weak">양호</option>
-          <option value="antdiff">Ant Diff</option><option value="normal">정상</option>
+          <option value="">전체</option><option value="issue">이슈집중</option>
+          <option value="weak_sig">신호세기미약</option><option value="inter">셀중첩간섭</option>
+          <option value="high_bler">HighBLER</option><option value="normal">양호</option>
+          <option value="antdiff">Ant Diff</option>
         </select>
         <button class="btn" onclick="exportTop3Stations('csv')" title="상위 3개 기지국 CSV 저장"><i class="fa fa-download"></i> CSV 저장</button>
         <button class="btn" onclick="exportTop3Stations('copy')" title="상위 3개 기지국 클립보드 복사"><i class="fa fa-copy"></i> 클립보드 복사</button>
@@ -550,20 +551,22 @@ function buildStationMap(){
     const bNum=BAND_MAP[String(s.dch)];s.band=bNum!=null?String(bNum):(s.lbnd||s.dch||'');
     const totalRef=s.cends.length+s.drops.length;
     s.probCount=s.drops.length+s.nonMicMutes.length+s.rlfis.length;
+    s.dropRate=totalRef>0?(s.drops.length/totalRef*100):0;
     s.problemRate=totalRef>0?((s.drops.length+s.nonMicMutes.length)/totalRef*100):0;
     const allRsrp=[...s.dropRsrp,...s.muteRsrp,...s.rlfiRsrp];
     const allSinr=[...s.dropSinr,...s.muteSinr];
     s.avgRsrp=allRsrp.length?parseFloat(avgArr(allRsrp).toFixed(1)):null;
     s.avgSinr=allSinr.length?parseFloat(avgArr(allSinr).toFixed(1)):null;
     s.avgBler=s.muteBler.length?parseFloat(avgArr(s.muteBler).toFixed(1)):null;
-    s.weakRsrp=s.avgRsrp!==null&&s.avgRsrp<-100;
+    s.weakRsrp=s.avgRsrp!==null&&s.avgRsrp<=-100;
     s.weakSinr=s.avgSinr!==null&&s.avgSinr<0;
     s.isWeak=s.weakRsrp||s.weakSinr;
     s.hasAntDiff=s.antDiffDrops.length>=2;
     s.score=s.drops.length*10+s.nonMicMutes.length*2+s.rlfis.length;
-    if(s.probCount>=3&&s.problemRate>=30)s.level='critical';
-    else if(s.probCount>=2||s.problemRate>=15)s.level='warning';
-    else if(s.isWeak&&s.probCount>=1)s.level='weak';
+    if(s.probCount>=3)s.level='issue';
+    else if(s.weakRsrp)s.level='weak_sig';
+    else if(s.weakSinr)s.level='inter';
+    else if(s.avgBler!==null&&s.avgBler>=40)s.level='high_bler';
     else s.level='normal';
   });
 }
@@ -706,9 +709,9 @@ function renderNoti(){
     const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
     html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
   });
-  const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={critical:0,warning:1,weak:2};return(o[a.level]||9)-(o[b.level]||9)||(b.score-a.score);});
-  const lbl={critical:'위험',warning:'주의',weak:'약전계'};
-  const lc={critical:'tr',warning:'ta',weak:'tp'};
+  const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={issue:0,weak_sig:1,inter:2,high_bler:3};return(o[a.level]??9)-(o[b.level]??9)||(b.score-a.score);});
+  const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER'};
+  const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb'};
   stations.forEach(s=>{
     html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
   });
@@ -906,7 +909,7 @@ function renderStationTable(){
   const qBand=(document.getElementById('stBand').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
   const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999,bler:s=>s.avgBler??-999};
-  const lvO={critical:0,warning:1,weak:2,normal:3};
+  const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
     if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
@@ -921,8 +924,8 @@ function renderStationTable(){
     const fn=colFn[stSortCol];
     all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
   }
-  const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
-  const lc={critical:'tr',warning:'ta',weak:'tgr',normal:'tgr'};
+  const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
+  const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb',normal:'tgr'};
   const thW=(col,label,w,bg)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px${bg?';background:'+bg:''}">${label}</th>`;
   const G1='#1a4080',G2='#1a5c3a',G3='#3b1f6e';
   const G1s='#225099',G2s='#226645',G3s='#4a2880';
@@ -955,7 +958,7 @@ function renderStationTable(){
     const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
     const actRaw=stAllRows.map(r=>String(r.ACT_??'').trim()).find(a=>a)||'';
     const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):(s.rlfis.length>0&&s.drops.length===0&&s.mutes.length===0&&s.cends.length===0?'LTE':'');
-    const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
+    const dropCell=s.drops.length>0?`${s.drops.length}${s.dropRate>0?` <span style="font-size:11px;color:#e57373">(${s.dropRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
@@ -1327,7 +1330,7 @@ function exportCSV(){
   a.download='log_parsed.xls';a.click();
 }
 function getTop3Stations(){
-  const lvO={critical:0,warning:1,weak:2,normal:3};
+  const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   const all=Object.values(stationMap);
   all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.score-a.score));
   return all.slice(0,3);
@@ -1336,7 +1339,7 @@ function exportTop3Stations(mode){
   const top3=getTop3Stations();
   if(!top3.length){alert('기지국 데이터가 없습니다.');return;}
   const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
-  const lbl={critical:'불량',warning:'주의',weak:'양호',normal:'양호'};
+  const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
   const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
   const rows=top3.map((s,i)=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
