@@ -185,7 +185,8 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
       <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:3px" id="logSub">.LOG 파일을 업로드하여 분석을 시작하세요</div>
       <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);margin-top:4px" id="chipsetLine" style="display:none"></div>
     </div>
-    <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG 파일 열기</button>
+    <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG / CSV 파일 열기</button>
+    <button class="btn" onclick="pasteFromClipboard()" title="클립보드 붙여넣기"><i class="fa fa-clipboard"></i></button>
     <button class="btn" onclick="loadSample()">샘플 데이터</button>
     <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
   </div>
@@ -193,10 +194,10 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
        ondragover="event.preventDefault();this.classList.add('drag')"
        ondragleave="this.classList.remove('drag')"
        ondrop="event.preventDefault();this.classList.remove('drag');handleFile(event.dataTransfer.files[0])">
-    <input type="file" id="fileInput" accept=".log,.LOG,.txt" onchange="handleFile(this.files[0])">
+    <input type="file" id="fileInput" accept=".log,.LOG,.txt,.csv,.CSV" onchange="handleFile(this.files[0])">
     <div class="up-icon">📂</div>
-    <div class="up-label">.LOG 파일을 클릭하거나 여기로 드래그하세요</div>
-    <div class="up-hint">텍스트 형식의 .LOG 파일 (JSON 스타일 로그)</div>
+    <div class="up-label">.LOG / .CSV 파일을 클릭하거나 드래그하세요</div>
+    <div class="up-hint">.LOG (JSON 스타일) · .CSV (Date, Time, feature, custom_value 컬럼 포함)</div>
   </div>
 </div>
 
@@ -320,9 +321,16 @@ const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101"
 2026-04-08 14:00:00 DAST\t{"JVER":"SYH1","Ctype":"3","PLMN":"45005#"}
 2026-04-08 23:59:00 RLFC\t{"JVER":"SYH1","LRLF":"9","LDCH":"410","PLMN":"45005#"}`;
 
+function pasteFromClipboard(){
+  if(!navigator.clipboard||!navigator.clipboard.readText){alert('이 브라우저에서는 클립보드 접근이 지원되지 않습니다.');return;}
+  navigator.clipboard.readText().then(text=>{
+    if(!text||!text.trim()){alert('클립보드가 비어있습니다.');return;}
+    doParse(text,'clipboard');
+  }).catch(()=>alert('클립보드 접근 권한이 필요합니다.\n브라우저 주소창 왼쪽 자물쇠 아이콘에서 허용해주세요.'));
+}
 function handleFile(file){
   if(!file)return;
-  if(!/\.(log|txt)$/i.test(file.name)){alert('.LOG 또는 .TXT 파일만 업로드할 수 있습니다.');return;}
+  if(!/\.(log|txt|csv)$/i.test(file.name)){alert('.LOG, .TXT, .CSV 파일만 업로드할 수 있습니다.');return;}
   const tryParse=(encoding)=>new Promise((res,rej)=>{
     const reader=new FileReader();
     reader.onload=e=>{
@@ -384,13 +392,54 @@ function parseLine(line){
   let obj={};try{obj=JSON.parse(jsonStr);}catch{return null;}
   return{Date:date,Time:time,Feature:feature,...obj};
 }
+function splitCSVRow(line,sep){
+  if(sep==='\t')return line.split('\t');
+  const res=[];let cur='';let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+    else if(c===sep&&!inQ){res.push(cur);cur='';}
+    else cur+=c;
+  }
+  res.push(cur);
+  return res;
+}
+function parseCSV(text){
+  const lines=text.split('\n').map(l=>l.replace(/\r$/,'')).filter(l=>l.trim());
+  if(lines.length<2)return[];
+  const firstLine=lines[0].replace(/^﻿/,'');
+  const sep=firstLine.includes('\t')?'\t':',';
+  const headers=splitCSVRow(firstLine,sep).map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+  const idx={
+    date:  headers.findIndex(h=>h==='date'),
+    time:  headers.findIndex(h=>h==='time'),
+    feat:  headers.findIndex(h=>h==='feature'||h==='feat'||h==='feature_name'),
+    val:   headers.findIndex(h=>h==='custom_value'||h==='value'||h==='json'||h==='data')
+  };
+  if(idx.date<0||idx.time<0||idx.feat<0||idx.val<0)return[];
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const parts=splitCSVRow(lines[i],sep);
+    const date=(parts[idx.date]||'').trim().replace(/^"|"$/g,'');
+    const time=(parts[idx.time]||'').trim().replace(/^"|"$/g,'');
+    const feat=(parts[idx.feat]||'').trim().replace(/^"|"$/g,'').toUpperCase();
+    let jsonStr=(parts[idx.val]||'').trim().replace(/^"|"$/g,'');
+    if(!date||!time||!feat||!jsonStr)continue;
+    let obj={};try{obj=JSON.parse(jsonStr);}catch{continue;}
+    rows.push({Date:date,Time:time,Feature:feat,...obj});
+  }
+  return rows;
+}
 function doParse(text,filename){
   if(!text||!text.trim()){alert('파일 내용이 비어있습니다.');return;}
   // BOM 제거
   if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
-  allRows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
+  // LOG 형식 시도, 실패 시 CSV 시도
+  let rows=text.split('\n').filter(l=>l.trim()).map(parseLine).filter(Boolean);
+  if(!rows.length)rows=parseCSV(text);
+  allRows=rows;
   if(!allRows.length){
-    alert('파싱 실패. 로그 형식을 확인해주세요.\n\n지원 형식:\n날짜 시간 Feature{TAB}{JSON}\n날짜 시간 Feature {JSON}');
+    alert('파싱 실패. 지원 형식을 확인해주세요.\n\n[LOG] 날짜 시간 Feature{TAB}{JSON}\n[CSV] Date,Time,feature,custom_value 컬럼 포함');
     return;
   }
   const ks=new Set();allRows.forEach(r=>Object.keys(r).forEach(k=>ks.add(k)));
