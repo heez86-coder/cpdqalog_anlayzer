@@ -999,26 +999,45 @@ function buildRawRows(){
     }
   });
   rows.sort((a,b)=>{const da=a.Date+a.Time,db=b.Date+b.Time;return da<db?-1:da>db?1:0;});
-  const GROUP_FEATS=new Set(['MUTE','CEND','DROP','PSCI']);
   const toSec=r=>{
     if(r._sec!=null)return r._sec;
     const t=new Date(r.Date+'T'+r.Time);
     r._sec=isNaN(t.getTime())?0:Math.floor(t.getTime()/1000);
     return r._sec;
   };
-  rows.forEach(r=>r._grpKey=null);
-  const grpRows=rows.filter(r=>GROUP_FEATS.has(r.Feature));
+  rows.forEach(r=>{r._grpKey=null;toSec(r);});
+  // Step 1: CEND+CTIM 기반 통화 윈도우 그룹
+  let gid=0;
+  const callWindows=[];
+  rows.forEach(r=>{
+    if(r.Feature==='CEND'){
+      const ctim=parseInt(r.CTIM||0,10);
+      if(ctim>0)callWindows.push({start:toSec(r)-ctim,end:toSec(r),gid:gid++});
+    }
+  });
+  if(callWindows.length>0){
+    rows.forEach(r=>{
+      const s=toSec(r);
+      for(const w of callWindows){if(s>=w.start&&s<=w.end){r._grpKey='grp'+w.gid;break;}}
+    });
+    const gcnt={};
+    rows.forEach(r=>{if(r._grpKey)gcnt[r._grpKey]=(gcnt[r._grpKey]||0)+1;});
+    rows.forEach(r=>{if(r._grpKey&&gcnt[r._grpKey]<=1)r._grpKey=null;});
+  }
+  // Step 2: 윈도우 밖 GROUP_FEATS는 2초 근접 그룹핑
+  const GROUP_FEATS=new Set(['MUTE','CEND','DROP','PSCI']);
+  const grpRows=rows.filter(r=>!r._grpKey&&GROUP_FEATS.has(r.Feature));
   grpRows.sort((a,b)=>toSec(a)-toSec(b));
   if(grpRows.length>0){
-    let gid=0;
-    grpRows[0]._grpIdx=0;
+    let pid=0;
+    grpRows[0]._proxIdx=0;
     for(let i=1;i<grpRows.length;i++){
-      if(toSec(grpRows[i])-toSec(grpRows[i-1])<=2)grpRows[i]._grpIdx=gid;
-      else grpRows[i]._grpIdx=++gid;
+      if(toSec(grpRows[i])-toSec(grpRows[i-1])<=2)grpRows[i]._proxIdx=pid;
+      else grpRows[i]._proxIdx=++pid;
     }
-    const gcnt={};
-    grpRows.forEach(r=>gcnt[r._grpIdx]=(gcnt[r._grpIdx]||0)+1);
-    grpRows.forEach(r=>{r._grpKey=gcnt[r._grpIdx]>1?('grp'+r._grpIdx):null;});
+    const pcnt={};
+    grpRows.forEach(r=>pcnt[r._proxIdx]=(pcnt[r._proxIdx]||0)+1);
+    grpRows.forEach(r=>{r._grpKey=pcnt[r._proxIdx]>1?('grp'+(gid+r._proxIdx)):null;});
   }
   return rows;
 }
