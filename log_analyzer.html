@@ -501,7 +501,7 @@ function buildRlfEvents(){
 }
 function buildStationMap(){
   stationMap={};
-  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',band:'',drops:[],mutes:[],nonMicMutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],rlfiRsrp:[],antDiffDrops:[]};};
+  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',band:'',drops:[],mutes:[],nonMicMutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],muteBler:[],rlfiRsrp:[],antDiffDrops:[]};};
   allRows.forEach(r=>{
     const f=r.Feature;
     if(['CEND','DROP','MUTE'].includes(f)){
@@ -523,8 +523,8 @@ function buildStationMap(){
         const isMicOnly=['SAMS','MCST','SMBU','TXSF'].some(k=>parseInt(r[k]||0,10)>0||r[k]==='1'||r[k]===1);
         const hasSoundMute=SOUND_TYPES.some(t=>r[t.key]==='1'||r[t.key]===1);
         if(hasSoundMute||!isMicOnly)s.nonMicMutes.push(r);
-        const rsrp=fNum(r.RSRP),sinr=fNum(r.CINR);
-        if(rsrp!==null)s.muteRsrp.push(rsrp);if(sinr!==null)s.muteSinr.push(sinr);
+        const rsrp=fNum(r.RSRP),sinr=fNum(r.CINR),bler=fNum(r.BLER);
+        if(rsrp!==null)s.muteRsrp.push(rsrp);if(sinr!==null)s.muteSinr.push(sinr);if(bler!==null&&bler>0)s.muteBler.push(bler);
       }
     }
   });
@@ -545,6 +545,7 @@ function buildStationMap(){
     const allSinr=[...s.dropSinr,...s.muteSinr];
     s.avgRsrp=allRsrp.length?parseFloat(avgArr(allRsrp).toFixed(1)):null;
     s.avgSinr=allSinr.length?parseFloat(avgArr(allSinr).toFixed(1)):null;
+    s.avgBler=s.muteBler.length?parseFloat(avgArr(s.muteBler).toFixed(1)):null;
     s.weakRsrp=s.avgRsrp!==null&&s.avgRsrp<-100;
     s.weakSinr=s.avgSinr!==null&&s.avgSinr<0;
     s.isWeak=s.weakRsrp||s.weakSinr;
@@ -706,6 +707,13 @@ function renderMuteTab(){
   const txTypes=SOUND_TYPES.filter(t=>t.cat==='tx');
   const rxRows=muteRows.filter(r=>rxTypes.some(t=>isOne(r[t.key])));
   const txRows=muteRows.filter(r=>txTypes.some(t=>isOne(r[t.key])));
+  const muteRsrps=muteRows.map(r=>fNum(r.RSRP)).filter(v=>v!==null);
+  const muteSinrs=muteRows.map(r=>fNum(r.CINR)).filter(v=>v!==null);
+  const muteBlers=muteRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0);
+  const avgMuteRsrp=muteRsrps.length?avgArr(muteRsrps).toFixed(1):null;
+  const avgMuteSinr=muteSinrs.length?avgArr(muteSinrs).toFixed(1):null;
+  const avgMuteBler=muteBlers.length?avgArr(muteBlers).toFixed(1):null;
+  const fmtM=v=>v!==null?v:'-';
   let html=`<div class="st">전체 기간 MUTE 유형 분포</div><div class="mg">
     ${mCard('전체 MUTE',total+'건','')}
     ${mCard('Rx (수화) 이상',rxRows.length+'건',pct(rxRows.length,total)+'%',rxRows.length>0?'warn':'')}
@@ -713,6 +721,11 @@ function renderMuteTab(){
     ${mCard('마이크 이상',micRowsAll.length+'건',pct(micRowsAll.length,total)+'%',micRowsAll.length>0?'warn':'')}
     ${mCard('사용자 의도',userRows.length+'건',pct(userRows.length,total)+'%')}
     ${unknownRows.length>0?mCard('유형 미분류',unknownRows.length+'건',''):''}
+  </div>
+  <div class="mg" style="margin-top:6px">
+    ${avgMuteRsrp!==null?mCard('avg RSRP',fmtM(avgMuteRsrp),'수신전력 평균',parseFloat(avgMuteRsrp)<-100?'warn':''):''}
+    ${avgMuteSinr!==null?mCard('avg SINR',fmtM(avgMuteSinr),'SINR 평균',parseFloat(avgMuteSinr)<0?'warn':''):''}
+    ${avgMuteBler!==null?mCard('avg BLER',fmtM(avgMuteBler)+'%','BLER 평균',parseFloat(avgMuteBler)>=40?'warn':''):''}
   </div>`;
   html+=buildCat('Rx (수화) 이상 — RSMT · RNMT · DBMT',rxTypes,rxRows,'tb');
   html+=buildCat('Tx (송화) 이상 — UBMT',txTypes,txRows,'tp');
@@ -733,7 +746,10 @@ function renderMuteTab(){
     });
     const cendBadge=cendN>0?'<span class="badge" style="background:#e8f4fd;color:#1a6fa0">CEND '+cendN+'건</span>':'';
     const rateBadge=muteRate?'<span style="font-size:11px;color:#b7640a;font-weight:600;margin-left:6px">MUTE율 '+muteRate+'%</span>':'';
-    html+='<div class="day-card"><div class="day-hdr"><span class="day-dt">'+d+'</span><span class="badge tb">MUTE '+dRows.length+'건</span>'+cendBadge+rateBadge+'</div><div class="day-body">'+body+'</div></div>';
+    const dBlers=dRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0);
+    const dBlerAvg=dBlers.length?avgArr(dBlers).toFixed(1):null;
+    const blerSpan=dBlerAvg!==null?'<span style="font-size:12px;color:'+(parseFloat(dBlerAvg)>=40?'var(--orange)':'var(--text-secondary)')+'">BLER avg <b>'+dBlerAvg+'%</b></span>':'';
+    html+='<div class="day-card"><div class="day-hdr"><span class="day-dt">'+d+'</span><span class="badge tb">MUTE '+dRows.length+'건</span>'+cendBadge+rateBadge+blerSpan+'</div><div class="day-body">'+body+'</div></div>';
   });
   document.getElementById('muteContent').innerHTML=html;
 }
@@ -750,10 +766,12 @@ function renderDropTab(){
   if(!total){document.getElementById('dropContent').innerHTML='<div class="no-data">DROP 데이터가 없습니다.</div>';return;}
   const rsrps=dropRows.map(getDropRSRP).filter(v=>v!==null);
   const sinrs=dropRows.map(getDropSINR).filter(v=>v!==null);
+  const dropBlers=dropRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0);
   const antDiff=dropRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
   const weakSig=dropRows.filter(r=>getDropRSRP(r)!==null&&getDropRSRP(r)<-100);
   const lowSnr=dropRows.filter(r=>getDropSINR(r)!==null&&getDropSINR(r)<0);
   const fmtV=v=>v!==null?v.toFixed(1):'-';
+  const avgDropBler=dropBlers.length?avgArr(dropBlers).toFixed(1):null;
   // Cause 분석
   const causeCnts={};
   dropRows.forEach(r=>{const c=String(r.SIPR||'').trim();if(c)causeCnts[c]=(causeCnts[c]||0)+1;});
@@ -762,6 +780,7 @@ function renderDropTab(){
     ${mCard('총 DROP',total+'건','')}
     ${mCard('avg RSRP',fmtV(avgArr(rsrps)),'수신전력 평균',avgArr(rsrps)<-100?'warn':'')}
     ${mCard('avg SINR',fmtV(avgArr(sinrs)),'SINR 평균',avgArr(sinrs)<0?'warn':'')}
+    ${avgDropBler!==null?mCard('avg BLER',avgDropBler+'%','BLER 평균',parseFloat(avgDropBler)>=40?'warn':''):''}
     ${mCard('Ant Diff ≥20dB',antDiff.length+'건',pct(antDiff.length,total)+'%',antDiff.length>0?'danger':'')}
     ${mCard('약전계 DROP',weakSig.length+'건','RSRP < -100',weakSig.length>0?'warn':'')}
     ${mCard('저SINR DROP',lowSnr.length+'건','SINR < 0',lowSnr.length>0?'warn':'')}
@@ -807,6 +826,9 @@ function renderDropTab(){
     const sinrBad=sinrAvg!==null&&parseFloat(sinrAvg)<0;
     const rsrpSpan=rsrpAvg!==null?'<span style="font-size:12px;color:'+(rsrpBad?'var(--red)':'var(--text-secondary)')+'">RSRP avg <b>'+rsrpAvg+'</b></span>':'';
     const sinrSpan=sinrAvg!==null?'<span style="font-size:12px;color:'+(sinrBad?'var(--orange)':'var(--text-secondary)')+'">SINR avg <b>'+sinrAvg+'</b></span>':'';
+    const dBlers2=dRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0);
+    const blerAvg2=dBlers2.length?avgArr(dBlers2).toFixed(1):null;
+    const blerSpan2=blerAvg2!==null?'<span style="font-size:12px;color:'+(parseFloat(blerAvg2)>=40?'var(--orange)':'var(--text-secondary)')+'">BLER avg <b>'+blerAvg2+'%</b></span>':'';
     const adSpan=ad.length?'<span class="badge ttl" style="font-size:10px">Ant Diff '+ad.length+'건</span>':'';
     const tRows=dRows.map(r=>{
       const sipr=String(r.SIPR||'').trim();
@@ -824,7 +846,7 @@ function renderDropTab(){
     html+='<div class="day-card">'
       +'<div class="day-hdr"><span class="day-dt">'+d+'</span>'
       +'<span class="badge tr">DROP '+dRows.length+'건</span>'
-      +rsrpSpan+sinrSpan+adSpan+'</div>'
+      +rsrpSpan+sinrSpan+blerSpan2+adSpan+'</div>'
       +'<div style="overflow-x:auto"><table>'
       +'<thead><tr><th style="width:72px">Time</th><th style="width:110px">PLMN</th>'
       +'<th style="width:72px">TAC(HEX)</th><th style="width:72px">TAC(DEC)</th>'
@@ -839,7 +861,7 @@ function renderStationTable(){
   const qPci=(document.getElementById('stPci').value||'').toLowerCase();
   const qBand=(document.getElementById('stBand').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
-  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999};
+  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999,bler:s=>s.avgBler??-999};
   const lvO={critical:0,warning:1,weak:2,normal:3};
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
@@ -867,7 +889,7 @@ function renderStationTable(){
     +'<th rowspan="2" style="width:62px;min-width:62px;background:var(--blue-800)">상태</th>'
     +grpTh('기지국 정보',6,G1)
     +grpTh('발생 이벤트',4,G2)
-    +grpTh('전계 정보(평균)',2,G3)
+    +grpTh('전계 정보(평균)',3,G3)
     +'</tr>'
     +'<tr>'
     +`<th style="width:86px;min-width:86px;background:${G1s}">PLMN</th>`
@@ -877,7 +899,7 @@ function renderStationTable(){
     +`<th style="width:52px;min-width:52px;background:${G1s}">PCI</th>`
     +`<th style="width:56px;min-width:56px;background:${G1s}">Band</th>`
     +thW('cend','CEND',52,G2s)+thW('drop','DROP',52,G2s)+thW('mute','MUTE',52,G2s)+thW('rlfi','RLF',52,G2s)
-    +thW('rsrp','RSRP',72,G3s)+thW('sinr','SINR',72,G3s)
+    +thW('rsrp','RSRP',72,G3s)+thW('sinr','SINR',72,G3s)+thW('bler','BLER',60,G3s)
     +'</tr>';
   document.getElementById('stBody').innerHTML=all.length?all.map((s,i)=>{
     const rk=i+1;
@@ -903,8 +925,9 @@ function renderStationTable(){
       <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
+      <td style="color:${s.avgBler!==null&&s.avgBler>=40?'#b7640a':'inherit'};font-weight:${s.avgBler!==null&&s.avgBler>=40?700:400}">${s.avgBler!==null?s.avgBler:'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="14" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="15" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
 }
 function renderDaily(){
@@ -1008,6 +1031,8 @@ function getRawRSRP(r){
   return r.RSRP??'';
 }
 function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}return r.CINR??'';}
+function getRawBLER(r){const v=fNum(r.BLER??'');return v!==null&&v>0?String(v):'';}
+
 function getRawCause(r){
   const f=r.Feature;
   if(f==='RLF'){const v=r.CAU??'';return v!==''?`${v} : ${CAU_CODES[String(v)]||'Unknown'}`:''}
@@ -1131,8 +1156,8 @@ function getRawNote(r){
   if(String(r.ACT_??'').trim()==='2')notes.push('3G확인필요');
   return notes.join(' · ');
 }
-const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','Cause','참고'];
-const RAW_COL_W={'Date':92,'Time':76,'Feature':56,'PLMN':88,'ACT':64,'TAC(HEX)':64,'TAC(DEC)':64,'PhID':44,'Band(DLCh)':78,'RSRP':52,'SINR':50,'Cause':145,'참고':185};
+const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','BLER','Cause','참고'];
+const RAW_COL_W={'Date':92,'Time':76,'Feature':56,'PLMN':88,'ACT':64,'TAC(HEX)':64,'TAC(DEC)':64,'PhID':44,'Band(DLCh)':78,'RSRP':52,'SINR':50,'BLER':48,'Cause':145,'참고':185};
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -1176,6 +1201,7 @@ function renderRaw(){
       if(c==='Band(DLCh)')return'<td style="text-align:center">'+getRawBandDLCh(r)+'</td>';
       if(c==='RSRP')return'<td style="text-align:center">'+getRawRSRP(r)+'</td>';
       if(c==='SINR')return'<td style="text-align:center">'+getRawSINR(r)+'</td>';
+      if(c==='BLER')return'<td style="text-align:center">'+getRawBLER(r)+'</td>';
       if(c==='Cause'){const cv=getRawCause(r);return'<td style="font-size:11px;color:var(--text-secondary);white-space:normal;line-height:1.4">'+cv+'</td>';}
       if(c==='참고'){const nv=getRawNote(r);return'<td style="font-size:11px;color:var(--teal);white-space:normal;line-height:1.7">'+nv.split(' · ').join('<br>')+'</td>';}
       return'<td style="text-align:center">'+v+'</td>';
@@ -1236,6 +1262,7 @@ function exportCSV(){
     if(c==='Band(DLCh)')return getRawBandDLCh(r);
     if(c==='RSRP')return String(getRawRSRP(r));
     if(c==='SINR')return String(getRawSINR(r));
+    if(c==='BLER')return String(getRawBLER(r));
     if(c==='Cause')return getRawCause(r);
     if(c==='참고')return getRawNote(r);
     return String(r[c]??'');
