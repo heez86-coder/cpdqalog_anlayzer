@@ -388,6 +388,7 @@ function parseLine(line){
     feature=preParts.slice(2).join(' ').toUpperCase();
     jsonStr=line.slice(bi).trim();
   }
+  feature=feature.replace(/[^A-Z0-9]/g,'');
   if(!date||!time||!feature||!jsonStr)return null;
   let obj={};try{obj=JSON.parse(jsonStr);}catch{return null;}
   return{Date:date,Time:time,Feature:feature,...obj};
@@ -422,7 +423,7 @@ function parseCSV(text){
     const parts=splitCSVRow(lines[i],sep);
     const date=(parts[idx.date]||'').trim().replace(/^"|"$/g,'');
     const time=(parts[idx.time]||'').trim().replace(/^"|"$/g,'');
-    const feat=(parts[idx.feat]||'').trim().replace(/^"|"$/g,'').toUpperCase();
+    const feat=(parts[idx.feat]||'').trim().replace(/^"|"$/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
     let jsonStr=(parts[idx.val]||'').trim().replace(/^"|"$/g,'');
     if(!date||!time||!feat||!jsonStr)continue;
     let obj={};try{obj=JSON.parse(jsonStr);}catch{continue;}
