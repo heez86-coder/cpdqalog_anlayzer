@@ -184,6 +184,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
       <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-.02em" id="logTitle">CpGdDqaLog Analyzer</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:3px" id="logPart">SQE2 Global 필드검증파트</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:3px" id="logSub">.LOG 파일을 업로드하여 분석을 시작하세요</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:4px;display:none" id="modelVerLine"></div>
       <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);margin-top:4px" id="chipsetLine" style="display:none"></div>
     </div>
     <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG / CSV 파일 열기</button>
@@ -418,7 +419,9 @@ function parseCSV(text){
     date:  headers.findIndex(h=>h==='date'),
     time:  headers.findIndex(h=>h==='time'),
     feat:  headers.findIndex(h=>h==='feature'||h==='feat'||h==='feature_name'),
-    val:   headers.findIndex(h=>h==='custom_value'||h==='value'||h==='json'||h==='data')
+    val:   headers.findIndex(h=>h==='custom_value'||h==='value'||h==='json'||h==='data'),
+    modelId: headers.findIndex(h=>h==='model_id'||h==='modelid'||h==='model'),
+    swVer:   headers.findIndex(h=>h==='sw_ver'||h==='swver'||h==='sw_version'||h==='software_version')
   };
   if(idx.date<0||idx.time<0||idx.feat<0||idx.val<0)return[];
   const rows=[];
@@ -430,7 +433,10 @@ function parseCSV(text){
     let jsonStr=(parts[idx.val]||'').trim().replace(/^"|"$/g,'');
     if(!date||!time||!feat||!jsonStr)continue;
     let obj={};try{obj=JSON.parse(jsonStr);}catch{continue;}
-    rows.push({Date:date,Time:time,...obj,Feature:feat});
+    const extra={};
+    if(idx.modelId>=0){const v=(parts[idx.modelId]||'').trim().replace(/^"|"$/g,'');if(v)extra.model_id=v;}
+    if(idx.swVer>=0){const v=(parts[idx.swVer]||'').trim().replace(/^"|"$/g,'');if(v)extra.sw_ver=v;}
+    rows.push({Date:date,Time:time,...obj,...extra,Feature:feat});
   }
   return rows;
 }
@@ -585,6 +591,37 @@ function renderHeader(filename){
   const op=getOperator();
   document.getElementById('logTitle').textContent='CpGdDqa.LOG Analyzer';
   document.getElementById('logSub').textContent=`${d0} ~ ${d1} (${dates.length}일치 데이터)`;
+  // model_id / sw_ver (CSV 칼럼 또는 JSON 키)
+  const getCI=(r,k)=>{const lo=k.toLowerCase();const key=Object.keys(r).find(x=>x.toLowerCase()===lo);return key?r[key]:undefined;};
+  const fmtMD=d=>{const p=d.split('-');return p.length>=3?`${parseInt(p[1])}/${parseInt(p[2])}`:d;};
+  const modelId=(()=>{const r=allRows.find(r=>getCI(r,'model_id'));return r?getCI(r,'model_id'):'';})();
+  const swVerRanges=(()=>{
+    const dateVer={};
+    dates.forEach(d=>{
+      const cnt={};
+      byDate(d).forEach(r=>{const v=getCI(r,'sw_ver');if(v)cnt[v]=(cnt[v]||0)+1;});
+      const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+      if(top)dateVer[d]=top[0];
+    });
+    const verDates=dates.filter(d=>dateVer[d]);
+    if(!verDates.length)return[];
+    const ranges=[];
+    verDates.forEach(d=>{
+      const v=dateVer[d];
+      if(ranges.length&&ranges[ranges.length-1].ver===v)ranges[ranges.length-1].end=d;
+      else ranges.push({ver:v,start:d,end:d});
+    });
+    return ranges;
+  })();
+  const mvl=document.getElementById('modelVerLine');
+  const mvParts=[];
+  if(modelId)mvParts.push(`Model : ${modelId}`);
+  if(swVerRanges.length){
+    const verStr=swVerRanges.map(({ver,start,end})=>start===end?`${ver} (${fmtMD(start)})`:(`${ver} (${fmtMD(start)}~${fmtMD(end)})`)).join(',  ');
+    mvParts.push(`SW ver : ${verStr}`);
+  }
+  if(mvParts.length){mvl.innerHTML=mvParts.join('<br>');mvl.style.display='block';}
+  else{mvl.style.display='none';}
   const cl=document.getElementById('chipsetLine');
   const featCnt=[...new Set(allRows.map(r=>r.Feature))].length;
   const stCnt=Object.keys(stationMap).length;
