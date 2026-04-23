@@ -112,7 +112,7 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 #tab-raw .tw{overflow-x:hidden}
 #tab-raw table{table-layout:fixed;width:100%}
 #tab-raw tbody td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 6px;font-size:11px}
-#tab-raw tbody td:last-child{overflow:visible;padding:2px 2px;text-align:center}
+#tab-raw tbody td:last-child{overflow:visible;padding:2px 4px 2px 2px;text-align:center}
 #tab-raw thead th{padding:8px 6px;font-size:11px}
 table{border-collapse:collapse;font-size:13px;width:100%}
 thead th{background:var(--blue-800);padding:10px 13px;text-align:left;font-weight:700;font-size:12px;color:rgba(255,255,255,0.92);white-space:nowrap}
@@ -428,7 +428,7 @@ function parseCSV(text){
     let jsonStr=(parts[idx.val]||'').trim().replace(/^"|"$/g,'');
     if(!date||!time||!feat||!jsonStr)continue;
     let obj={};try{obj=JSON.parse(jsonStr);}catch{continue;}
-    rows.push({Date:date,Time:time,Feature:feat,...obj});
+    rows.push({Date:date,Time:time,...obj,Feature:feat});
   }
   return rows;
 }
@@ -1195,7 +1195,7 @@ function renderRaw(){
     const callCell=isFirst&&gc?'<td style="text-align:center;padding:2px 1px"><span style="display:inline-flex;align-items:center;justify-content:center;padding:2px 4px;border-radius:99px;background:'+gc.bd+';color:#fff;font-size:9px;font-weight:700;white-space:nowrap;cursor:default" title="Call #'+callNum+' 동일 시간 이벤트 그룹">Call #'+callNum+'</span></td>':isGrp&&gc?'<td style="padding:0 22px"><div style="width:3px;height:28px;border-radius:2px;background:'+gc.bd+';opacity:0.5;margin:auto"></div></td>':'<td></td>';
     const mainRow='<tr style="'+grpStyle+'">'+callCell+RAW_FIXED.map(c=>{
       const v=r[c]??'';
-      if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};const tip=FEAT_DESC[v]||'';return'<td style="text-align:center"><span class="badge feat-tip" style="background:'+col.bg+';color:'+col.tc+'"'+(tip?' data-tip="'+tip+'"':'')+'>'+v+'</span></td>';}
+      if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};const tip=FEAT_DESC[v]||'';return'<td style="text-align:center;font-size:0"><span class="badge feat-tip" style="font-size:11px;background:'+col.bg+';color:'+col.tc+'"'+(tip?' data-tip="'+tip+'"':'')+'>'+v+'</span></td>';}
       if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return'<td style="text-align:center">'+(raw?raw+(op?'('+op+')':''):'' )+'</td>';}
       if(c==='ACT'){if(r.Feature==='RLF')return'<td style="text-align:center">4(LTE)</td>';const v2=String(r.ACT_??'').trim();const lbl=ACT_MAP[v2];return'<td style="text-align:center">'+(v2?(lbl?v2+'('+lbl+')':v2):'')+'</td>';}
       if(c==='TAC(HEX)')return'<td style="text-align:center">'+(r.TAC_??'')+'</td>';
