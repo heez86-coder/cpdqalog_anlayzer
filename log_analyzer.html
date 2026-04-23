@@ -922,7 +922,7 @@ function renderStationTable(){
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
-    const muteTip=muteTipParts.length?`전체 ${s.mutes.length}건 (마이크제외 ${s.nonMicMutes.length}건)\n`+muteTipParts.join(', '):`전체 ${s.mutes.length}건 (마이크제외 ${s.nonMicMutes.length}건)`;
+    const muteTip=muteTipParts.join(', ');
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
