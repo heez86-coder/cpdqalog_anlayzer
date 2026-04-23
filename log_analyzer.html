@@ -112,6 +112,7 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 #tab-raw .tw{overflow-x:hidden}
 #tab-raw table{table-layout:fixed;width:100%}
 #tab-raw tbody td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 6px;font-size:11px}
+#tab-raw tbody td:last-child{overflow:visible;padding:2px 2px;text-align:center}
 #tab-raw thead th{padding:8px 6px;font-size:11px}
 table{border-collapse:collapse;font-size:13px;width:100%}
 thead th{background:var(--blue-800);padding:10px 13px;text-align:left;font-weight:700;font-size:12px;color:rgba(255,255,255,0.92);white-space:nowrap}
@@ -391,7 +392,7 @@ function parseLine(line){
   feature=feature.replace(/[^A-Z0-9]/g,'');
   if(!date||!time||!feature||!jsonStr)return null;
   let obj={};try{obj=JSON.parse(jsonStr);}catch{return null;}
-  return{Date:date,Time:time,Feature:feature,...obj};
+  return{Date:date,Time:time,...obj,Feature:feature};
 }
 function splitCSVRow(line,sep){
   if(sep==='\t')return line.split('\t');
@@ -1203,8 +1204,8 @@ function renderRaw(){
       if(c==='RSRP')return'<td style="text-align:center">'+getRawRSRP(r)+'</td>';
       if(c==='SINR')return'<td style="text-align:center">'+getRawSINR(r)+'</td>';
       if(c==='BLER')return'<td style="text-align:center">'+getRawBLER(r)+'</td>';
-      if(c==='Cause'){const cv=getRawCause(r);return'<td style="font-size:11px;color:var(--text-secondary);white-space:normal;line-height:1.4">'+cv+'</td>';}
-      if(c==='참고'){const nv=getRawNote(r);return'<td style="font-size:11px;color:var(--teal);white-space:normal;line-height:1.7">'+nv.split(' · ').join('<br>')+'</td>';}
+      if(c==='Cause'){const cv=getRawCause(r);return'<td style="font-size:9px;color:var(--text-secondary);white-space:normal;line-height:1.4">'+cv+'</td>';}
+      if(c==='참고'){const nv=getRawNote(r);return'<td style="font-size:9px;color:var(--teal);white-space:normal;line-height:1.7">'+nv.split(' · ').join('<br>')+'</td>';}
       return'<td style="text-align:center">'+v+'</td>';
     }).join('')+'<td><button class="det-btn" onclick="toggleDetail('+gi+')" title="세부 정보">'+(isOpen?'▲':'▼')+'</button></td></tr>';
     if(!isOpen)return mainRow;
