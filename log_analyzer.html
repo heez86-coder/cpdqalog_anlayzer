@@ -174,6 +174,26 @@ input[type=text],select{padding:8px 12px;font-size:13px;border:1.5px solid var(-
 input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 
 .no-data{text-align:center;padding:2.5rem;color:#94a3b8;font-size:13px;font-weight:600}
+/* 인사이트 */
+.insight-list{display:flex;flex-direction:column;gap:5px;margin-bottom:18px}
+.insight-item{display:flex;align-items:flex-start;gap:10px;font-size:12.5px;padding:8px 12px;border-radius:6px;line-height:1.55;border-left:3px solid transparent}
+.i-danger{background:#fff0f0;border-left-color:#c0392b;color:#7b241c}
+.i-warn{background:#fff8ef;border-left-color:#e67e22;color:#7d4100}
+.i-info{background:#eef4ff;border-left-color:#2980b9;color:#1a4870}
+.i-good{background:#f0faf3;border-left-color:#1e8449;color:#1a5235}
+.i-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:5px}
+/* 타임라인 */
+#tlWrap{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);margin-bottom:10px;overflow:hidden}
+.tl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--blue-50);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text-primary);cursor:pointer}
+.tl-body{padding:8px 12px 10px;overflow-x:auto}
+.tl-row{display:flex;align-items:center;height:22px}
+.tl-label{width:52px;font-size:10px;font-weight:700;flex-shrink:0;padding-right:4px;text-align:right}
+.tl-track{flex:1;position:relative;height:22px;border-bottom:1px solid #f0f0f0}
+.tl-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);cursor:default;top:7px;opacity:.8;transition:opacity .1s}
+.tl-dot:hover{opacity:1;z-index:2}
+.tl-sep{position:absolute;top:0;bottom:0;border-left:1px dashed #d0d5dd;pointer-events:none}
+.tl-daylbl{position:absolute;top:-17px;font-size:9px;color:#94a3b8;transform:translateX(-50%);white-space:nowrap}
+.tl-axis{position:relative;height:16px;margin-left:52px}
 </style>
 </head>
 <body>
@@ -215,6 +235,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
   </div>
   <div class="tab-content">
     <div id="tab-overview">
+      <div id="insightContent"></div>
       <div class="st">통화 품질</div><div class="mg" id="callM"></div>
       <div class="st">무선 품질</div><div class="mg" id="radioM"></div>
       <div class="st">망등록 이슈</div><div class="mg" id="regiM"></div>
@@ -242,12 +263,19 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
     <div id="tab-daily" style="display:none"><div id="dailyContent"></div></div>
     <div id="tab-trend" style="display:none"><div id="trendContent"></div></div>
     <div id="tab-raw" style="display:none">
+      <div id="tlWrap" style="display:none">
+        <div class="tl-head" onclick="toggleTimeline()">
+          <span>📈 이벤트 타임라인</span><span id="tlChevron">▼</span>
+        </div>
+        <div id="tlBody" class="tl-body" style="display:none"><div id="tlInner"></div></div>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
         <input type="text" id="rawSearch" placeholder="검색..." oninput="filterRaw()" style="flex:1;min-width:120px">
         <input type="date" id="rawDateFrom" onchange="filterRaw()" title="시작일">
         <span style="color:var(--text-secondary);font-size:12px">~</span>
         <input type="date" id="rawDateTo" onchange="filterRaw()" title="종료일">
         <button class="btn" onclick="exportCSV()">Excel 저장</button>
+        <button class="btn" onclick="toggleTimeline()" id="tlToggleBtn">타임라인</button>
       </div>
       <div id="rawFeatChk" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:var(--blue-50);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px"></div>
       <div class="tw"><table><thead id="rawHead"></thead><tbody id="rawBody"></tbody></table></div>
@@ -463,7 +491,11 @@ function doParse(text,filename){
   document.getElementById('resetBtn').style.display='';
   buildRlfEvents();
   stSortCol='default';stSortDir='desc';rawOpenIdx=new Set();
-  renderHeader(filename);renderOverview();renderMuteTab();renderDropTab();renderDaily();initRaw();
+  renderHeader(filename);renderInsights();renderOverview();renderMuteTab();renderDropTab();renderDaily();
+  tlOpen=false;const tlW=document.getElementById('tlWrap');if(tlW)tlW.style.display='block';
+  const tlB=document.getElementById('tlBody');if(tlB)tlB.style.display='none';
+  const tlC=document.getElementById('tlChevron');if(tlC)tlC.textContent='▼';
+  initRaw();
   showTab('overview');
 }
 function getDates(){return[...new Set(allRows.map(r=>r.Date))].sort();}
@@ -668,6 +700,127 @@ function calcKPI(rows){
     nsvc,nos1,rcr1,sim1};
 }
 function mCard(label,val,sub,cls){return`<div class="mc${cls?' '+cls:''}"><div class="ml">${label}</div><div class="mv">${val}</div>${sub?`<div class="ms">${sub}</div>`:''}</div>`;}
+
+function renderInsights(){
+  const el=document.getElementById('insightContent');
+  if(!el||!allRows.length){if(el)el.innerHTML='';return;}
+  const items=[];
+  const totalDrop=byFeat('DROP').length,totalCend=byFeat('CEND').length,totalCall=totalDrop+totalCend;
+  const dates=getDates();
+  // 1. DROP률
+  if(totalCall>0){
+    const dr=totalDrop/totalCall*100;
+    if(dr>=10)items.push({lv:'danger',t:`전체 DROP률 ${dr.toFixed(1)}% — 심각 수준 (기준: 10% 초과)`});
+    else if(dr>=5)items.push({lv:'warn',t:`전체 DROP률 ${dr.toFixed(1)}% — 주의 (기준: 5% 초과)`});
+    else items.push({lv:'good',t:`전체 DROP률 ${dr.toFixed(1)}% — 양호`});
+  }
+  // 2. DROP 집중 기지국
+  const stList=Object.values(stationMap);
+  const topDropSt=stList.filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length)[0];
+  if(topDropSt&&totalDrop>0){
+    const pct=Math.round(topDropSt.drops.length/totalDrop*100);
+    if(pct>=50)items.push({lv:'danger',t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중 → 특정 기지국 문제 의심`});
+    else if(pct>=30)items.push({lv:'warn',t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중`});
+  }
+  // 3. Ant Diff
+  const antCnt=stList.filter(s=>s.hasAntDiff).length;
+  if(antCnt>0)items.push({lv:'warn',t:`Ant Diff 의심 기지국 ${antCnt}개 — 안테나 불균형(HW 이상) 확인 필요`});
+  // 4. CP Crash
+  const crshCnt=byFeat('CRSH').length;
+  if(crshCnt>0)items.push({lv:'danger',t:`CP Crash ${crshCnt}회 발생 — 단말 안정성 이슈 확인 필요`});
+  // 5. MUTE 주요 원인
+  const muteRows=byFeat('MUTE');
+  if(muteRows.length>=2){
+    const typeCnt={};
+    SOUND_TYPES.forEach(t=>{const n=muteRows.filter(r=>r[t.key]==='1'||r[t.key]===1).length;if(n>0)typeCnt[t.key]=n;});
+    const total=Object.values(typeCnt).reduce((s,n)=>s+n,0);
+    if(total>0){
+      const [topT,topN]=Object.entries(typeCnt).sort((a,b)=>b[1]-a[1])[0];
+      const pct=Math.round(topN/total*100);
+      const lblM={RSMT:'RSMT (Short Mute)',RNMT:'RNMT (수신없음)',DBMT:'DBMT (DL BLER)',UBMT:'UBMT (UL BLER)'};
+      if(pct>=60)items.push({lv:'info',t:`MUTE 원인의 ${pct}%가 ${lblM[topT]||topT} — ${topT.startsWith('R')?'수신측':'BLER 과다'} 집중`});
+    }
+  }
+  // 6. 전체 RSRP / SINR
+  const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
+  const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
+  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)items.push({lv:'danger',t:`전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`});else if(v<=-100)items.push({lv:'warn',t:`전체 평균 RSRP ${v} dBm — 약전계 구간 다수`});}
+  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)items.push({lv:'warn',t:`전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`});}
+  // 7. DROP 집중일
+  if(dates.length>1){
+    const dayD=dates.map(d=>({d,n:byFeat('DROP',byDate(d)).length})).filter(x=>x.n>0);
+    if(dayD.length>0){
+      dayD.sort((a,b)=>b.n-a.n);
+      const avg=dayD.reduce((s,x)=>s+x.n,0)/dayD.length;
+      const w=dayD[0];
+      if(w.n>=3&&w.n>=avg*2.2)items.push({lv:'info',t:`${w.d} DROP ${w.n}건 집중 — 평균(${avg.toFixed(1)}건) 대비 최다 발생일`});
+    }
+  }
+  // 8. SIM 이슈
+  const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
+  if(simdChg>0)items.push({lv:'info',t:`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`});
+
+  if(!items.length)items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.'});
+  el.innerHTML='<div class="st" style="margin-top:0;margin-bottom:8px">자동 인사이트</div>'
+    +'<div class="insight-list">'+items.map(it=>`<div class="insight-item i-${it.lv}"><div class="i-dot"></div><span>${it.t}</span></div>`).join('')+'</div>';
+}
+
+const TL_FEATS=['CEND','DROP','MUTE','RLFI','CRSH','SIMD','REST','REGI','MMRJ'];
+const TL_COLORS={CEND:'#1a6fa0',DROP:'#c0392b',MUTE:'#b7640a',RLFI:'#1e8449',CRSH:'#8e1a1a',SIMD:'#6c3483',REST:'#888888',REGI:'#2980b9',MMRJ:'#8e44ad'};
+let tlOpen=false;
+function toggleTimeline(){
+  tlOpen=!tlOpen;
+  const body=document.getElementById('tlBody');
+  const chev=document.getElementById('tlChevron');
+  if(!body)return;
+  body.style.display=tlOpen?'block':'none';
+  if(chev)chev.textContent=tlOpen?'▲':'▼';
+  if(tlOpen)renderTimeline();
+}
+function renderTimeline(){
+  const inner=document.getElementById('tlInner');if(!inner)return;
+  const rows=buildRawRows().filter(r=>TL_FEATS.includes(r.Feature));
+  if(!rows.length){inner.innerHTML='<div class="no-data">표시할 이벤트 없음</div>';return;}
+  const toMs=r=>{const t=new Date(r.Date+'T'+r.Time);return isNaN(t.getTime())?0:t.getTime();};
+  const msArr=rows.map(toMs).filter(t=>t>0);
+  if(!msArr.length){inner.innerHTML='<div class="no-data">시간 정보 없음</div>';return;}
+  const minMs=Math.min(...msArr),maxMs=Math.max(...msArr),span=maxMs-minMs||1;
+  const xPct=ms=>(((ms-minMs)/span)*100).toFixed(3)+'%';
+  const dates=getDates();
+  const activeFeats=TL_FEATS.filter(f=>rows.some(r=>r.Feature===f));
+  // Day separator axis
+  let axisHtml='<div class="tl-axis">';
+  dates.forEach((d,i)=>{
+    const ms=new Date(d+'T00:00:00').getTime();
+    if(ms<minMs||ms>maxMs+1)return;
+    const p=xPct(Math.max(ms,minMs));
+    axisHtml+=`<div class="tl-sep" style="left:${p}"></div><div class="tl-daylbl" style="left:${p}">${d.slice(5).replace('-','/')}</div>`;
+  });
+  axisHtml+='</div>';
+  // Feature rows
+  let rowsHtml='';
+  activeFeats.forEach(feat=>{
+    const color=TL_COLORS[feat]||'#888';
+    const featRows=rows.filter(r=>r.Feature===feat);
+    let dots='';
+    featRows.forEach(r=>{
+      const ms=toMs(r);if(!ms)return;
+      const tip=buildTlTip(r);
+      dots+=`<span class="tl-dot" style="left:${xPct(ms)};background:${color}" data-tip="${tip}"></span>`;
+    });
+    rowsHtml+=`<div class="tl-row"><div class="tl-label" style="color:${color}">${feat}</div><div class="tl-track">${dots}</div></div>`;
+  });
+  inner.innerHTML=axisHtml+rowsHtml;
+}
+function buildTlTip(r){
+  let t=`${r.Date} ${r.Time}  [${r.Feature}]`;
+  if(r.Feature==='DROP'&&r.SIPR)t+=`\nSIPR ${r.SIPR}: ${DROP_CAUSES[r.SIPR]||'Unknown'}`;
+  if(r.Feature==='CEND'&&r.CTIM){const s=parseInt(r.CTIM||0);t+=`\n통화시간 ${Math.floor(s/60)}분 ${s%60}초`;}
+  if(r.Feature==='MUTE'){const cs=['RSMT','RNMT','DBMT','UBMT'].filter(k=>r[k]==='1'||r[k]===1);if(cs.length)t+=`\n원인: ${cs.join(', ')}`;}
+  if(r.TAC_)t+=`\nTAC ${r.TAC_}${r.PhID?' / PCI '+r.PhID:''}`;
+  return t.replace(/"/g,"'");
+}
+
 function renderOverview(){
   const k=calcKPI(allRows);
   const days=Math.max(getDates().length,1);
