@@ -921,6 +921,8 @@ function renderStationTable(){
     const dropCell=s.drops.length>0?`${s.drops.length}${s.problemRate>0?` <span style="font-size:11px;color:#e57373">(${s.problemRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
+    const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
+    const muteTip=muteTipParts.length?`전체 ${s.mutes.length}건 (마이크제외 ${s.nonMicMutes.length}건)\n`+muteTipParts.join(', '):`전체 ${s.mutes.length}건 (마이크제외 ${s.nonMicMutes.length}건)`;
     return`<tr>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
@@ -928,7 +930,7 @@ function renderStationTable(){
       <td>${s.tac}</td><td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
-      <td style="color:${s.nonMicMutes.length>0?'#b7640a':'inherit'}" title="전체 MUTE: ${s.mutes.length}건 / 마이크 제외: ${s.nonMicMutes.length}건">${s.nonMicMutes.length}</td>
+      <td style="color:${s.nonMicMutes.length>0?'#b7640a':'inherit'}" data-tip="${muteTip}">${s.nonMicMutes.length}</td>
       <td style="color:${s.rlfis.length>0?'#1a6fa0':'inherit'}">${s.rlfis.length}</td>
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
