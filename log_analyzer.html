@@ -837,9 +837,9 @@ function renderInsights(){
   const totalRlfi=stList.reduce((s,st)=>s+(st.rlfis?st.rlfis.length:0),0);
   const rlfTotal=byFeat('RLFC').reduce((s,r)=>s+parseFloat(r.LRLF||0),0)||totalRlfi;
   if(rlfTotal>=3){
-    const rsrpTxt=topRlfSt&&topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
-    const sinrTxt=topRlfSt&&topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
-    const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+    const rlfiRsrpAvg=topRlfSt&&topRlfSt.rlfiRsrp.length?parseFloat(avgArr(topRlfSt.rlfiRsrp).toFixed(1)):null;
+    const rsrpTxt=rlfiRsrpAvg!==null?` RSRP ${rlfiRsrpAvg}dBm`:'';
+    const sigTxt=rsrpTxt?` [전계:${rsrpTxt}]`:'';
     const stTxt=topRlfSt?` — 집중 기지국: TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
     push(rlfTotal>=7?'danger':'warn',`RLF 이벤트 ${rlfTotal}건 발생${stTxt}`,'radio');
   }
@@ -1255,8 +1255,8 @@ function renderStationTable(){
     const stAllRows=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=stAllRows.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
     const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
-    const actRaw=stAllRows.map(r=>String(r.ACT_??'').trim()).find(a=>a)||'';
-    const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):(s.rlfis.length>0&&s.drops.length===0&&s.mutes.length===0&&s.cends.length===0?'LTE':'');
+    const actRaw=stAllRows.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
+    const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const dropCell=s.drops.length>0?`${s.drops.length}${s.dropRate>0?` <span style="font-size:11px;color:#e57373">(${s.dropRate.toFixed(1)}%)</span>`:''}`:0;
     const rsrpBad=s.avgRsrp!==null&&s.avgRsrp<=-100;
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
@@ -1644,8 +1644,8 @@ function exportTop3Stations(mode){
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
     const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
-    const actRaw=allR.map(r=>String(r.ACT_??'').trim()).find(a=>a)||'';
-    const actDisp=actRaw?(ACT_MAP_ST[actRaw]||actRaw):'';
+    const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
+    const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
     return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null?String(s.avgRsrp):'-',s.avgSinr!==null?String(s.avgSinr):'-',s.avgBler!==null?String(s.avgBler):'-'];
   });
