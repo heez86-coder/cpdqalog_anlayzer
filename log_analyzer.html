@@ -757,17 +757,26 @@ function renderInsights(){
       items.push({lv:'warn',t:`TAC ${topMuteSt.tac} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`});
     }
   }
-  // 4. RLF 집중 기지국
+  // 4. RLF — 다발 시 기지국 + 전계 표시
   const topRlfSt=stList.filter(s=>s.rlfis&&s.rlfis.length>0).sort((a,b)=>b.rlfis.length-a.rlfis.length)[0];
   const totalRlfi=stList.reduce((s,st)=>s+(st.rlfis?st.rlfis.length:0),0);
-  if(topRlfSt&&topRlfSt.rlfis.length>=2&&totalRlfi>=3){
-    const pct=Math.round(topRlfSt.rlfis.length/totalRlfi*100);
-    if(pct>=40){
-      const rsrpTxt=topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
-      const sinrTxt=topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
-      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-      items.push({lv:'warn',t:`TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid}에 RLF의 ${pct}% 집중 (${topRlfSt.rlfis.length}건)${sigTxt}`});
-    }
+  if(totalRlfi>=3){
+    const rsrpTxt=topRlfSt&&topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
+    const sinrTxt=topRlfSt&&topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
+    const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+    const stTxt=topRlfSt?` — 집중 기지국: TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
+    items.push({lv:totalRlfi>=7?'danger':'warn',t:`RLF 이벤트 ${totalRlfi}건 발생${stTxt}`});
+  }
+  // 5. SCGF 다발 — 원인(FTYP) + 기지국
+  const scgfRows=byFeat('SCGF');
+  if(scgfRows.length>=3){
+    const ftyps=scgfRows.map(r=>String(r.FTYP||r.FTyp||'').trim()).filter(Boolean);
+    const topFtyp=topVal(ftyps);
+    const causeStr=topFtyp?` — 주요 원인: ${SCGF_FTYP[topFtyp]||topFtyp}`:'';
+    const tacVals=scgfRows.map(r=>String(r.TAC_||r.TAC||'').trim()).filter(Boolean);
+    const topTac=topVal(tacVals);
+    const tacStr=topTac?` / TAC ${topTac} 집중`:'';
+    items.push({lv:scgfRows.length>=7?'danger':'warn',t:`SCG Failure ${scgfRows.length}건 발생${causeStr}${tacStr}`});
   }
   // 5. Ant Diff — 총 발생 이벤트건수 기준
   const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
@@ -806,22 +815,27 @@ function renderInsights(){
     if(pdpiCnt>=3)parts.push(`PDPI ${pdpiCnt}건`);
     items.push({lv:pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',t:`PDP 연결 오류 다수 — ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`});
   }
-  // 10. 특정 오디오 기기 연결 시 이벤트 집중 (MUTE: PATH, DROP/CEND: AUST)
+  // 12. 특정 오디오 기기 연결 시 이벤트 집중 (MUTE: PATH, DROP: AUST)
   {
+    // pct 계산: 전체 이벤트 기준으로 표시하고 dominance는 기기정보 있는 행 기준으로 판단
     const mutePaths=muteRows.map(r=>String(r.PATH??'').trim()).filter(p=>PATH_LBL[p]);
     if(mutePaths.length>=3){
       const topP=topVal(mutePaths);
       const topN=mutePaths.filter(p=>p===topP).length;
-      const pct=Math.round(topN/mutePaths.length*100);
-      if(pct>=70)items.push({lv:'info',t:`MUTE 이벤트의 ${pct}%가 ${PATH_LBL[topP]} 연결 시 발생 (${topN}/${mutePaths.length}건) — 해당 기기 연결 조건 점검`});
+      if(topN/mutePaths.length>=0.7&&topN>=3){
+        const dispPct=Math.round(topN/muteRows.length*100);
+        items.push({lv:'info',t:`MUTE ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${muteRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`});
+      }
     }
     const dropRows=byFeat('DROP');
     const dropPaths=dropRows.map(r=>String(r.AUST??'').trim()).filter(p=>PATH_LBL[p]);
     if(dropPaths.length>=3){
       const topP=topVal(dropPaths);
       const topN=dropPaths.filter(p=>p===topP).length;
-      const pct=Math.round(topN/dropPaths.length*100);
-      if(pct>=70)items.push({lv:'warn',t:`DROP 이벤트의 ${pct}%가 ${PATH_LBL[topP]} 연결 시 발생 (${topN}/${dropPaths.length}건) — 해당 기기 연결 조건 점검`});
+      if(topN/dropPaths.length>=0.7&&topN>=3){
+        const dispPct=Math.round(topN/dropRows.length*100);
+        items.push({lv:'warn',t:`DROP ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${dropRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`});
+      }
     }
   }
   // 11. 전체 RSRP / SINR
