@@ -914,13 +914,26 @@ function renderInsights(){
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
   const GRP_LBL={drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
-  let html='<div class="st" style="margin-top:0;margin-bottom:10px">자동 인사이트</div>';
   const grouped=[];let curGrpG=null,curItemsG=[];
   items.forEach(it=>{
     if(it.grp!==curGrpG){if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});curGrpG=it.grp;curItemsG=[it];}
     else curItemsG.push(it);
   });
   if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});
+  // 클립보드용 텍스트 생성
+  let plainTxt='';
+  grouped.forEach(g=>{
+    const lbl=g.grp?GRP_LBL[g.grp]||g.grp:'';
+    if(lbl)plainTxt+=lbl+'\n';
+    g.items.forEach(it=>{plainTxt+='• '+it.t+'\n';});
+    plainTxt+='\n';
+  });
+  plainTxt=plainTxt.trimEnd();
+  let html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+    +'<span class="st" style="margin:0">자동 인사이트</span>'
+    +'<button id="insightCopyBtn" onclick="copyInsightText()" title="인사이트 복사" style="background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:4px;color:#94a3b8;display:flex;align-items:center" onmouseenter="this.style.color=\'#475569\'" onmouseleave="this.style.color=\'#94a3b8\'">'
+    +'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+    +'</button></div>';
   grouped.forEach(g=>{
     const lbl=g.grp?GRP_LBL[g.grp]||g.grp:'';
     html+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px">';
@@ -930,6 +943,22 @@ function renderInsights(){
     html+='</div></div>';
   });
   el.innerHTML=html;
+  el._insightTxt=plainTxt;
+}
+function copyInsightText(){
+  const el=document.getElementById('insightContent');
+  const txt=el?el._insightTxt:'';
+  if(!txt)return;
+  navigator.clipboard.writeText(txt).then(()=>{
+    const btn=document.getElementById('insightCopyBtn');
+    if(!btn)return;
+    btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    btn.style.color='#22c55e';
+    setTimeout(()=>{
+      btn.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      btn.style.color='#94a3b8';
+    },1500);
+  });
 }
 
 const TL_FEATS=['CEND','DROP','MUTE','RLFI','CRSH','SIMD','REST','REGI','MMRJ'];
