@@ -856,7 +856,7 @@ function renderInsights(){
       const [topTac,topPid]=topKey.split('|');
       const topDch=String(topKeyRows[0]?.DLCh||topKeyRows[0]?.DLCH||'').trim();
       const topBand=topDch?` / Band ${getDchBand(topDch)}`:'';
-      scgfStTxt=` / TAC ${topTac}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
+      scgfStTxt=` - 집중 기지국 : TAC ${topTac}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
     }
     push(scgfRows.length>=7?'danger':'warn',`SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
   }
@@ -890,16 +890,21 @@ function renderInsights(){
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
   const GRP_LBL={drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
-  let html='<div class="st" style="margin-top:0;margin-bottom:8px">자동 인사이트</div><div class="insight-list">';
-  let curGrp=null;
+  let html='<div class="st" style="margin-top:0;margin-bottom:10px">자동 인사이트</div>';
+  const grouped=[];let curGrpG=null,curItemsG=[];
   items.forEach(it=>{
-    if(it.grp&&it.grp!==curGrp){
-      curGrp=it.grp;
-      html+=`<div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:.03em;padding:6px 2px 2px;border-top:1px solid #e2e8f0;margin-top:4px">${GRP_LBL[curGrp]||curGrp}</div>`;
-    }
-    html+=`<div class="insight-item i-${it.lv}"><div class="i-dot"></div><span>${it.t}</span></div>`;
+    if(it.grp!==curGrpG){if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});curGrpG=it.grp;curItemsG=[it];}
+    else curItemsG.push(it);
   });
-  html+='</div>';
+  if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});
+  grouped.forEach(g=>{
+    const lbl=g.grp?GRP_LBL[g.grp]||g.grp:'';
+    html+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+    if(lbl)html+=`<div style="font-size:13px;font-weight:700;color:#475569;letter-spacing:.03em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #e2e8f0">${lbl}</div>`;
+    html+='<div class="insight-list" style="margin-bottom:0;gap:4px">';
+    g.items.forEach(it=>{html+=`<div class="insight-item i-${it.lv}"><div class="i-dot"></div><span>${it.t}</span></div>`;});
+    html+='</div></div>';
+  });
   el.innerHTML=html;
 }
 
@@ -1391,7 +1396,7 @@ function getRawCause(r){
     return parts.join(', ');
   }
   if(f==='SCGF'){const v=String(r.Ftyp??'').trim();if(!v)return'';if(v==='N')return'N';return v+' : '+(SCGF_FTYP[v]||'Unknown');}
-  if(f==='PSCI')return r.FLCD??'';
+  if(f==='PSCI'){const fl=String(r.FLCD??'').trim();return fl==='1803'?'캐치콜수신':''}
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPF_ENDR[v]||'')):''}
   if(f==='PDPI'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPI_ENDR[v]||'')):''};
@@ -1481,7 +1486,7 @@ function getRawNote(r){
   }
   if(f==='DROP'){const ct=String(r.Ctyp??'').trim(),cs=String(r.Csta??'').trim();if((ct==='4'||ct==='5')&&cs!==''&&cs!=='1'&&cs!=='2')notes.push('Setup fail');}
   if(f==='CEND'){const sec=parseInt(r.CTIM||0,10);if(sec>0){const m=Math.floor(sec/60),s=sec%60;notes.push(`통화시간 : ${m}분 ${s}초`);}}
-  if(f==='PSCI'){const fl=String(r.FLCD??'').trim();if(fl)notes.push(fl==='1803'?'캐치콜수신':`FLCD ${fl}`);}
+  if(f==='PSCI'){const fl=String(r.FLCD??'').trim();if(fl==='1803')notes.push('캐치콜수신');}
   if(f==='MIPI'){const mid=String(r.MID_??'').trim(),pid=String(r.PID_??'').trim();if((mid&&mid!=='0000')||(pid&&pid!=='0000'))notes.push('MID : '+mid+', PID : '+pid+' 확인필요');}
   if(f==='RFPD'){const msg=r.MSG_??'';if(msg)notes.push(String(msg));}
   if(f==='CRSH'){const msg=r.Msg_??'';if(msg)notes.push(String(msg));}
