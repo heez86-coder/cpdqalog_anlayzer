@@ -707,6 +707,8 @@ function renderInsights(){
   const items=[];
   const totalDrop=byFeat('DROP').length,totalCend=byFeat('CEND').length,totalCall=totalDrop+totalCend;
   const dates=getDates();
+  // helper: most common value in array
+  function topVal(arr){if(!arr.length)return null;const cnt={};arr.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];}
   // 1. DROP률
   if(totalCall>0){
     const dr=totalDrop/totalCall*100;
@@ -717,18 +719,50 @@ function renderInsights(){
   // 2. DROP 집중 기지국
   const stList=Object.values(stationMap);
   const topDropSt=stList.filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length)[0];
-  if(topDropSt&&totalDrop>0){
+  if(topDropSt&&totalDrop>=3){
     const pct=Math.round(topDropSt.drops.length/totalDrop*100);
-    if(pct>=50)items.push({lv:'danger',t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중 → 특정 기지국 문제 의심`});
-    else if(pct>=30)items.push({lv:'warn',t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중`});
+    if(pct>=50||pct>=30){
+      const lv=pct>=50?'danger':'warn';
+      const rsrpTxt=topDropSt.avgRsrp!==null?` RSRP ${topDropSt.avgRsrp.toFixed(1)}dBm`:'';
+      const sinrTxt=topDropSt.avgSinr!==null?` SINR ${topDropSt.avgSinr.toFixed(1)}dB`:'';
+      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+      const causes=topDropSt.drops.map(r=>r.SIPR).filter(Boolean);
+      const causeTxt=causes.length?` / 주요 Cause: ${topVal(causes)}`:'';
+      const suffix=pct>=50?' → 특정 기지국 문제 의심':'';
+      items.push({lv,t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`});
+    }
   }
-  // 3. Ant Diff
+  // 3. MUTE 집중 기지국
+  const topMuteSt=stList.filter(s=>s.nonMicMutes&&s.nonMicMutes.length>0).sort((a,b)=>b.nonMicMutes.length-a.nonMicMutes.length)[0];
+  const totalNonMicMute=stList.reduce((s,st)=>s+(st.nonMicMutes?st.nonMicMutes.length:0),0);
+  if(topMuteSt&&topMuteSt.nonMicMutes.length>=2&&totalNonMicMute>=3){
+    const pct=Math.round(topMuteSt.nonMicMutes.length/totalNonMicMute*100);
+    if(pct>=40){
+      const rsrpTxt=topMuteSt.avgRsrp!==null?` RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`:'';
+      const sinrTxt=topMuteSt.avgSinr!==null?` SINR ${topMuteSt.avgSinr.toFixed(1)}dB`:'';
+      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+      items.push({lv:'warn',t:`TAC ${topMuteSt.tac} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`});
+    }
+  }
+  // 4. RLF 집중 기지국
+  const topRlfSt=stList.filter(s=>s.rlfis&&s.rlfis.length>0).sort((a,b)=>b.rlfis.length-a.rlfis.length)[0];
+  const totalRlfi=stList.reduce((s,st)=>s+(st.rlfis?st.rlfis.length:0),0);
+  if(topRlfSt&&topRlfSt.rlfis.length>=2&&totalRlfi>=3){
+    const pct=Math.round(topRlfSt.rlfis.length/totalRlfi*100);
+    if(pct>=40){
+      const rsrpTxt=topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
+      const sinrTxt=topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
+      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+      items.push({lv:'warn',t:`TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid}에 RLF의 ${pct}% 집중 (${topRlfSt.rlfis.length}건)${sigTxt}`});
+    }
+  }
+  // 5. Ant Diff
   const antCnt=stList.filter(s=>s.hasAntDiff).length;
   if(antCnt>0)items.push({lv:'warn',t:`Ant Diff 의심 기지국 ${antCnt}개 — 안테나 불균형(HW 이상) 확인 필요`});
-  // 4. CP Crash
+  // 6. CP Crash
   const crshCnt=byFeat('CRSH').length;
   if(crshCnt>0)items.push({lv:'danger',t:`CP Crash ${crshCnt}회 발생 — 단말 안정성 이슈 확인 필요`});
-  // 5. MUTE 주요 원인
+  // 7. MUTE 주요 원인
   const muteRows=byFeat('MUTE');
   if(muteRows.length>=2){
     const typeCnt={};
@@ -741,12 +775,15 @@ function renderInsights(){
       if(pct>=60)items.push({lv:'info',t:`MUTE 원인의 ${pct}%가 ${lblM[topT]||topT} — ${topT.startsWith('R')?'수신측':'BLER 과다'} 집중`});
     }
   }
-  // 6. 전체 RSRP / SINR
+  // 8. 마이크이상 이벤트
+  const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
+  if(micMuteCnt>=3)items.push({lv:'warn',t:`마이크이상(SAMS/MCST/SMBU) 이벤트 ${micMuteCnt}건 — 단말 마이크 HW 이상 확인 필요`});
+  // 9. 전체 RSRP / SINR
   const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
   const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
   if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)items.push({lv:'danger',t:`전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`});else if(v<=-100)items.push({lv:'warn',t:`전체 평균 RSRP ${v} dBm — 약전계 구간 다수`});}
   if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)items.push({lv:'warn',t:`전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`});}
-  // 7. DROP 집중일
+  // 10. DROP 집중일
   if(dates.length>1){
     const dayD=dates.map(d=>({d,n:byFeat('DROP',byDate(d)).length})).filter(x=>x.n>0);
     if(dayD.length>0){
@@ -756,7 +793,7 @@ function renderInsights(){
       if(w.n>=3&&w.n>=avg*2.2)items.push({lv:'info',t:`${w.d} DROP ${w.n}건 집중 — 평균(${avg.toFixed(1)}건) 대비 최다 발생일`});
     }
   }
-  // 8. SIM 이슈
+  // 11. SIM 이슈
   const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
   if(simdChg>0)items.push({lv:'info',t:`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`});
 
@@ -1040,7 +1077,7 @@ function renderDropTab(){
         +'<td>'+(r.PhID??'')+'</td><td>'+(r.DLCh??'')+'</td>'
         +'<td style="font-size:11px">'+siprCell+'</td>'
         +'<td>'+adCell+'</td>'
-        +'<td style="font-size:11px;color:var(--teal);white-space:normal;min-width:100px;line-height:1.6">'+noteCell+'</td></tr>';
+        +'<td style="font-size:11px;color:#fff;white-space:normal;min-width:100px;line-height:1.6">'+noteCell+'</td></tr>';
     }).join('');
     html+='<div class="day-card">'
       +'<div class="day-hdr"><span class="day-dt">'+d+'</span>'
