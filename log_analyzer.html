@@ -817,7 +817,10 @@ function renderInsights(){
   }
   // 8. 마이크이상 이벤트
   const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
-  if(micMuteCnt>=3)items.push({lv:'warn',t:`마이크이상(SAMS/MCST/SMBU) 이벤트 ${micMuteCnt}건 — 단말 마이크 점검 필요`});
+  if(micMuteCnt>=3){
+    const micPct=(muteRows.length>0?(micMuteCnt/muteRows.length*100).toFixed(1):'?');
+    items.push({lv:'warn',t:`마이크이상(SAMS/MCST/SMBU) 이벤트 ${micMuteCnt}건 (${micPct}%, 총 통화횟수 ${totalCall}건) — 단말 마이크 점검 필요`});
+  }
   // 9. ATTI / ATTF / PDPI / PDPF 다수 발생
   const attiCnt=byFeat('ATTI').length,attfCnt=byFeat('ATTF').length;
   const pdpiCnt=byFeat('PDPI').length,pdpfCnt=byFeat('PDPF').length;
