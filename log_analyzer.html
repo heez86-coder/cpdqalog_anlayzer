@@ -716,19 +716,21 @@ function renderInsights(){
   const el=document.getElementById('insightContent');
   if(!el||!allRows.length){if(el)el.innerHTML='';return;}
   const items=[];
+  const push=(lv,t,grp)=>items.push({lv,t,grp});
   const totalDrop=byFeat('DROP').length,totalCend=byFeat('CEND').length,totalCall=totalDrop+totalCend;
   const dates=getDates();
-  // helper: most common value in array + its count
   function topVal(arr){if(!arr.length)return null;const cnt={};arr.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];}
   const PATH_LBL={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
-  // 1. DROP률
+  const stList=Object.values(stationMap);
+  const muteRows=byFeat('MUTE');
+  const dropRows=byFeat('DROP');
+
+  // ── Calldrop ─────────────────────────────────────────
   if(totalCall>0){
     const dr=totalDrop/totalCall*100;
-    if(dr>=10)items.push({lv:'danger',t:`전체 DROP률 ${dr.toFixed(1)}% — 심각 수준 (기준: 10% 초과)`});
-    else if(dr>=5)items.push({lv:'warn',t:`전체 DROP률 ${dr.toFixed(1)}% — 주의 (기준: 5% 초과)`});
+    if(dr>=10)push('danger',`전체 DROP률 ${dr.toFixed(1)}% — 심각 수준 (기준: 10% 초과)`,'drop');
+    else if(dr>=5)push('warn',`전체 DROP률 ${dr.toFixed(1)}% — 주의 (기준: 5% 초과)`,'drop');
   }
-  // 2. DROP 집중 기지국
-  const stList=Object.values(stationMap);
   const topDropSt=stList.filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length)[0];
   if(topDropSt&&totalDrop>=3){
     const pct=Math.round(topDropSt.drops.length/totalDrop*100);
@@ -741,60 +743,38 @@ function renderInsights(){
       const topC=topVal(causes);
       const causeTxt=topC?` / 주요 Cause: ${topC}${DROP_CAUSES[topC]?' ('+DROP_CAUSES[topC]+')':''}`:'';
       const suffix=pct>=50?' → 특정 기지국 문제 의심':'';
-      items.push({lv,t:`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`});
+      push(lv,`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
     }
   }
-  // 3. MUTE 집중 기지국
-  const topMuteSt=stList.filter(s=>s.nonMicMutes&&s.nonMicMutes.length>0).sort((a,b)=>b.nonMicMutes.length-a.nonMicMutes.length)[0];
-  const totalNonMicMute=stList.reduce((s,st)=>s+(st.nonMicMutes?st.nonMicMutes.length:0),0);
-  if(topMuteSt&&topMuteSt.nonMicMutes.length>=2&&totalNonMicMute>=3){
-    const pct=Math.round(topMuteSt.nonMicMutes.length/totalNonMicMute*100);
-    if(pct>=40){
-      const rsrpTxt=topMuteSt.avgRsrp!==null?` RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`:'';
-      const sinrTxt=topMuteSt.avgSinr!==null?` SINR ${topMuteSt.avgSinr.toFixed(1)}dB`:'';
-      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-      items.push({lv:'warn',t:`TAC ${topMuteSt.tac} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`});
+  if(dates.length>1){
+    const dayD=dates.map(d=>({d,n:byFeat('DROP',byDate(d)).length})).filter(x=>x.n>0);
+    if(dayD.length>0){
+      dayD.sort((a,b)=>b.n-a.n);
+      const avg=dayD.reduce((s,x)=>s+x.n,0)/dates.length;
+      const w=dayD[0];
+      if(w.n>=3&&w.n>=avg*2.2){
+        const [,mo,dy]=w.d.split('-');
+        push('info',`Calldrop 이벤트가 ${parseInt(mo)}/${parseInt(dy)}일에 집중(${w.n}건) — 평균 ${avg.toFixed(1)}건 대비 최다 발생`,'drop');
+      }
     }
   }
-  // 4. RLF — 무선품질과 동일한 RLFC 합산 기준으로 표시, 기지국은 RLFI 기반
-  const topRlfSt=stList.filter(s=>s.rlfis&&s.rlfis.length>0).sort((a,b)=>b.rlfis.length-a.rlfis.length)[0];
-  const totalRlfi=stList.reduce((s,st)=>s+(st.rlfis?st.rlfis.length:0),0);
-  const rlfTotal=byFeat('RLFC').reduce((s,r)=>s+parseFloat(r.LRLF||0),0)||totalRlfi;
-  if(rlfTotal>=3){
-    const rsrpTxt=topRlfSt&&topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
-    const sinrTxt=topRlfSt&&topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
-    const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-    const stTxt=topRlfSt?` — 집중 기지국: TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
-    items.push({lv:rlfTotal>=7?'danger':'warn',t:`RLF 이벤트 ${rlfTotal}건 발생${stTxt}`});
-  }
-  // 5. SCGF 다발 — 원인(FTYP) + TAC/PCI/Band + 비중
-  const scgfRows=byFeat('SCGF');
-  if(scgfRows.length>=3){
-    const ftyps=scgfRows.map(r=>String(r.FTYP||r.FTyp||'').trim()).filter(Boolean);
-    const topFtyp=topVal(ftyps);
-    const causeStr=topFtyp?` — 주요 원인: ${SCGF_FTYP[topFtyp]||topFtyp}`:'';
-    // 집중 기지국: TAC_+PhID 조합
-    const stKeys=scgfRows.map(r=>{const t=String(r.TAC_||r.TAC||'').trim(),p=String(r.PhID||'').trim();return(t&&p)?`${t}|${p}`:t||'';}).filter(Boolean);
-    const topKey=topVal(stKeys);
-    let scgfStTxt='';
-    if(topKey){
-      const topKeyRows=scgfRows.filter(r=>{const t=String(r.TAC_||r.TAC||'').trim(),p=String(r.PhID||'').trim();const k=(t&&p)?`${t}|${p}`:t||'';return k===topKey;});
-      const [topTac,topPid]=topKey.split('|');
-      const topDch=String(topKeyRows[0]?.DLCh||topKeyRows[0]?.DLCH||'').trim();
-      const topBand=topDch?` / Band ${getDchBand(topDch)}`:'';
-      const stPct=Math.round(topKeyRows.length/scgfRows.length*100);
-      scgfStTxt=` / TAC ${topTac}${topPid?' / PCI '+topPid:''}${topBand} (${stPct}%)`;
+  {
+    const dropPaths=dropRows.map(r=>String(r.AUST??'').trim()).filter(p=>PATH_LBL[p]);
+    if(dropPaths.length>=3){
+      const topP=topVal(dropPaths);const topN=dropPaths.filter(p=>p===topP).length;
+      const dispPct=Math.round(topN/dropRows.length*100);
+      if(topN/dropPaths.length>=0.7&&topN>=3&&dispPct>=50)
+        push('warn',`DROP ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${dropRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`,'drop');
     }
-    items.push({lv:scgfRows.length>=7?'danger':'warn',t:`SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`});
   }
-  // 5. Ant Diff — 총 발생 이벤트건수 기준
-  const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
-  if(antDropTotal>0)items.push({lv:'warn',t:`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`});
-  // 6. CP Crash
-  const crshCnt=byFeat('CRSH').length;
-  if(crshCnt>0)items.push({lv:'danger',t:`CP Crash ${crshCnt}회 발생 — 단말 안정성 이슈 확인 필요`});
-  // 7. MUTE 주요 원인 + MUTE율 + 평균 전계
-  const muteRows=byFeat('MUTE');
+  const callRows=[...byFeat('CEND'),...dropRows];
+  const g3Cnt=callRows.filter(r=>String(r.ACT_??'').trim()==='2').length;
+  if(g3Cnt>=3){
+    const g3Pct=Math.round(g3Cnt/callRows.length*100);
+    push('warn',`3G 통화이력 ${g3Cnt}건 (전체 통화 ${callRows.length}건 중 ${g3Pct}%) — 3G 통화 다수 발생 확인 필요`,'drop');
+  }
+
+  // ── 음성품질 (MUTE) ───────────────────────────────────
   if(muteRows.length>=2){
     const muteRate=totalCend>0?(muteRows.length/totalCend*100).toFixed(1):'?';
     const rsrpVals=muteRows.map(r=>parseFloat(r.RSRP??'')).filter(v=>!isNaN(v));
@@ -812,83 +792,103 @@ function renderInsights(){
       const lblM={RSMT:'RSMT (Short Mute)',RNMT:'RNMT (수신없음)',DBMT:'DBMT (DL BLER)',UBMT:'UBMT (UL BLER)'};
       if(pct>=60)causeTxt=` — 주요 원인 ${pct}%: ${lblM[topT]||topT} (${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'})`;
     }
-    const lv=parseFloat(muteRate)>=10?'warn':'info';
-    items.push({lv,t:`MUTE ${muteRows.length}건 (MUTE율 ${muteRate}%)${sigTxt}${causeTxt}`});
+    push(parseFloat(muteRate)>=10?'warn':'info',`MUTE ${muteRows.length}건 (MUTE율 ${muteRate}%)${sigTxt}${causeTxt}`,'mute');
   }
-  // 8. 마이크이상 이벤트
+  const topMuteSt=stList.filter(s=>s.nonMicMutes&&s.nonMicMutes.length>0).sort((a,b)=>b.nonMicMutes.length-a.nonMicMutes.length)[0];
+  const totalNonMicMute=stList.reduce((s,st)=>s+(st.nonMicMutes?st.nonMicMutes.length:0),0);
+  if(topMuteSt&&topMuteSt.nonMicMutes.length>=2&&totalNonMicMute>=3){
+    const pct=Math.round(topMuteSt.nonMicMutes.length/totalNonMicMute*100);
+    if(pct>=40){
+      const rsrpTxt=topMuteSt.avgRsrp!==null?` RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`:'';
+      const sinrTxt=topMuteSt.avgSinr!==null?` SINR ${topMuteSt.avgSinr.toFixed(1)}dB`:'';
+      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+      push('warn',`TAC ${topMuteSt.tac} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`,'mute');
+    }
+  }
   const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
   if(micMuteCnt>=3){
     const micPct=(muteRows.length>0?(micMuteCnt/muteRows.length*100).toFixed(1):'?');
-    items.push({lv:'warn',t:`마이크이상(SAMS/MCST/SMBU) 이벤트 ${micMuteCnt}건 (${micPct}%, 총 통화횟수 ${totalCall}건) — 단말 마이크 점검 필요`});
+    push('warn',`마이크이상(SAMS/MCST/SMBU) 이벤트 ${micMuteCnt}건 (${micPct}%, 총 통화횟수 ${totalCall}건) — 단말 마이크 점검 필요`,'mute');
   }
-  // 9. ATTI / ATTF / PDPI / PDPF 다수 발생
+  {
+    const mutePaths=muteRows.map(r=>String(r.PATH??'').trim()).filter(p=>PATH_LBL[p]);
+    if(mutePaths.length>=3){
+      const topP=topVal(mutePaths);const topN=mutePaths.filter(p=>p===topP).length;
+      const dispPct=Math.round(topN/muteRows.length*100);
+      if(topN/mutePaths.length>=0.7&&topN>=3&&dispPct>=50)
+        push('info',`MUTE ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${muteRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`,'mute');
+    }
+  }
+
+  // ── 무선품질 (RLF / SCG / 전계) ──────────────────────
+  const topRlfSt=stList.filter(s=>s.rlfis&&s.rlfis.length>0).sort((a,b)=>b.rlfis.length-a.rlfis.length)[0];
+  const totalRlfi=stList.reduce((s,st)=>s+(st.rlfis?st.rlfis.length:0),0);
+  const rlfTotal=byFeat('RLFC').reduce((s,r)=>s+parseFloat(r.LRLF||0),0)||totalRlfi;
+  if(rlfTotal>=3){
+    const rsrpTxt=topRlfSt&&topRlfSt.avgRsrp!==null?` RSRP ${topRlfSt.avgRsrp.toFixed(1)}dBm`:'';
+    const sinrTxt=topRlfSt&&topRlfSt.avgSinr!==null?` SINR ${topRlfSt.avgSinr.toFixed(1)}dB`:'';
+    const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
+    const stTxt=topRlfSt?` — 집중 기지국: TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
+    push(rlfTotal>=7?'danger':'warn',`RLF 이벤트 ${rlfTotal}건 발생${stTxt}`,'radio');
+  }
+  const scgfRows=byFeat('SCGF');
+  if(scgfRows.length>=3){
+    const ftyps=scgfRows.map(r=>String(r.FTYP||r.FTyp||'').trim()).filter(Boolean);
+    const topFtyp=topVal(ftyps);
+    const causeStr=topFtyp?` — 주요 원인: ${SCGF_FTYP[topFtyp]||topFtyp}`:'';
+    const stKeys=scgfRows.map(r=>{const t=String(r.TAC_||r.TAC||'').trim(),p=String(r.PhID||'').trim();return(t&&p)?`${t}|${p}`:t||'';}).filter(Boolean);
+    const topKey=topVal(stKeys);
+    let scgfStTxt='';
+    if(topKey){
+      const topKeyRows=scgfRows.filter(r=>{const t=String(r.TAC_||r.TAC||'').trim(),p=String(r.PhID||'').trim();const k=(t&&p)?`${t}|${p}`:t||'';return k===topKey;});
+      const [topTac,topPid]=topKey.split('|');
+      const topDch=String(topKeyRows[0]?.DLCh||topKeyRows[0]?.DLCH||'').trim();
+      const topBand=topDch?` / Band ${getDchBand(topDch)}`:'';
+      scgfStTxt=` / TAC ${topTac}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
+    }
+    push(scgfRows.length>=7?'danger':'warn',`SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
+  }
+  const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
+  if(antDropTotal>0)push('warn',`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`,'radio');
+  const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
+  const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
+  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`전체 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
+  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
+
+  // ── 단말 / 망 이슈 ────────────────────────────────────
+  const crshCnt=byFeat('CRSH').length;
+  if(crshCnt>0)push('danger',`CP Crash ${crshCnt}회 발생 — 단말 안정성 이슈 확인 필요`,'device');
   const attiCnt=byFeat('ATTI').length,attfCnt=byFeat('ATTF').length;
   const pdpiCnt=byFeat('PDPI').length,pdpfCnt=byFeat('PDPF').length;
   if(attfCnt>=3||attiCnt>=3){
     const parts=[];
     if(attfCnt>=3)parts.push(`ATTF ${attfCnt}건`);
     if(attiCnt>=3)parts.push(`ATTI ${attiCnt}건`);
-    items.push({lv:attfCnt>=5||attiCnt>=5?'danger':'warn',t:`LTE Attach 오류 다수 — ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`});
+    push(attfCnt>=5||attiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 — ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
   }
   if(pdpfCnt>=3||pdpiCnt>=3){
     const parts=[];
     if(pdpfCnt>=3)parts.push(`PDPF ${pdpfCnt}건`);
     if(pdpiCnt>=3)parts.push(`PDPI ${pdpiCnt}건`);
-    items.push({lv:pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',t:`PDP 연결 오류 다수 — ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`});
+    push(pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 — ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
   }
-  // 12. 특정 오디오 기기 연결 시 이벤트 집중 (MUTE: PATH, DROP: AUST) — 전체 대비 50% 이상일 때만
-  {
-    const mutePaths=muteRows.map(r=>String(r.PATH??'').trim()).filter(p=>PATH_LBL[p]);
-    if(mutePaths.length>=3){
-      const topP=topVal(mutePaths);
-      const topN=mutePaths.filter(p=>p===topP).length;
-      const dispPct=Math.round(topN/muteRows.length*100);
-      if(topN/mutePaths.length>=0.7&&topN>=3&&dispPct>=50)
-        items.push({lv:'info',t:`MUTE ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${muteRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`});
-    }
-    const dropRows=byFeat('DROP');
-    const dropPaths=dropRows.map(r=>String(r.AUST??'').trim()).filter(p=>PATH_LBL[p]);
-    if(dropPaths.length>=3){
-      const topP=topVal(dropPaths);
-      const topN=dropPaths.filter(p=>p===topP).length;
-      const dispPct=Math.round(topN/dropRows.length*100);
-      if(topN/dropPaths.length>=0.7&&topN>=3&&dispPct>=50)
-        items.push({lv:'warn',t:`DROP ${topN}건이 ${PATH_LBL[topP]} 연결 시 발생 (전체 ${dropRows.length}건 중 ${dispPct}%) — 해당 기기 연결 조건 점검`});
-    }
-  }
-  // 11. 전체 RSRP / SINR
-  const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
-  const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
-  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)items.push({lv:'danger',t:`전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`});else if(v<=-100)items.push({lv:'warn',t:`전체 평균 RSRP ${v} dBm — 약전계 구간 다수`});}
-  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)items.push({lv:'warn',t:`전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`});}
-  // 12. DROP 집중일
-  if(dates.length>1){
-    const dayD=dates.map(d=>({d,n:byFeat('DROP',byDate(d)).length})).filter(x=>x.n>0);
-    if(dayD.length>0){
-      dayD.sort((a,b)=>b.n-a.n);
-      const avg=dayD.reduce((s,x)=>s+x.n,0)/dates.length;
-      const w=dayD[0];
-      if(w.n>=3&&w.n>=avg*2.2){
-        const [,mo,dy]=w.d.split('-');
-        const dateStr=`${parseInt(mo)}/${parseInt(dy)}일`;
-        items.push({lv:'info',t:`Calldrop 이벤트가 ${dateStr}에 집중(${w.n}건) — 평균 ${avg.toFixed(1)}건 대비 최다 발생`});
-      }
-    }
-  }
-  // 13. 3G 통화 이력 (ACT_=2)
-  const callRows=[...byFeat('CEND'),...byFeat('DROP')];
-  const g3Cnt=callRows.filter(r=>String(r.ACT_??'').trim()==='2').length;
-  if(g3Cnt>=3){
-    const g3Pct=Math.round(g3Cnt/callRows.length*100);
-    items.push({lv:'warn',t:`3G 통화이력 ${g3Cnt}건 (전체 통화 ${callRows.length}건 중 ${g3Pct}%) — 3G 통화 다수 발생 확인 필요`});
-  }
-  // 14. SIM 이슈
   const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
-  if(simdChg>0)items.push({lv:'info',t:`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`});
+  if(simdChg>0)push('info',`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`,'device');
 
-  if(!items.length)items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.'});
-  el.innerHTML='<div class="st" style="margin-top:0;margin-bottom:8px">자동 인사이트</div>'
-    +'<div class="insight-list">'+items.map(it=>`<div class="insight-item i-${it.lv}"><div class="i-dot"></div><span>${it.t}</span></div>`).join('')+'</div>';
+  // ── 렌더링 ────────────────────────────────────────────
+  if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
+  const GRP_LBL={drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
+  let html='<div class="st" style="margin-top:0;margin-bottom:8px">자동 인사이트</div><div class="insight-list">';
+  let curGrp=null;
+  items.forEach(it=>{
+    if(it.grp&&it.grp!==curGrp){
+      curGrp=it.grp;
+      html+=`<div style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:.03em;padding:6px 2px 2px;border-top:1px solid #e2e8f0;margin-top:4px">${GRP_LBL[curGrp]||curGrp}</div>`;
+    }
+    html+=`<div class="insight-item i-${it.lv}"><div class="i-dot"></div><span>${it.t}</span></div>`;
+  });
+  html+='</div>';
+  el.innerHTML=html;
 }
 
 const TL_FEATS=['CEND','DROP','MUTE','RLFI','CRSH','SIMD','REST','REGI','MMRJ'];
