@@ -1134,7 +1134,7 @@ function renderDropTab(){
       +'<th style="width:72px">TAC(HEX)</th><th style="width:72px">TAC(DEC)</th>'
       +'<th style="width:52px">PCI</th><th style="width:60px">DLCh</th>'
       +'<th style="width:160px">Cause (SIPR)</th><th style="width:70px"></th>'
-      +'<th style="min-width:120px;color:var(--teal)">참고</th></tr></thead>'
+      +'<th style="min-width:120px;color:#fff">참고</th></tr></thead>'
       +'<tbody>'+tRows+'</tbody></table></div></div>';
   });
   document.getElementById('dropContent').innerHTML=html;
@@ -1488,7 +1488,7 @@ function renderRaw(){
       if(c==='SINR')return'<td style="text-align:center">'+getRawSINR(r)+'</td>';
       if(c==='BLER')return'<td style="text-align:center">'+getRawBLER(r)+'</td>';
       if(c==='Cause'){const cv=getRawCause(r);return'<td style="font-size:9px;color:var(--text-secondary);white-space:normal;line-height:1.4">'+cv+'</td>';}
-      if(c==='참고'){const nv=getRawNote(r);return'<td style="font-size:9px;color:var(--teal);white-space:normal;line-height:1.7">'+nv.split(' · ').join('<br>')+'</td>';}
+      if(c==='참고'){const nv=getRawNote(r);return'<td style="font-size:9px;color:#222;white-space:normal;line-height:1.7">'+nv.split(' · ').join('<br>')+'</td>';}
       return'<td style="text-align:center">'+v+'</td>';
     }).join('')+'<td><button class="det-btn" onclick="toggleDetail('+gi+')" title="세부 정보">'+(isOpen?'▲':'▼')+'</button></td></tr>';
     if(!isOpen)return mainRow;
