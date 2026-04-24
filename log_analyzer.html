@@ -447,17 +447,28 @@ function parseCSV(text){
   const idx={
     date:  headers.findIndex(h=>h==='date'),
     time:  headers.findIndex(h=>h==='time'),
+    genTs: headers.findIndex(h=>h==='generation_timestamp'),
     feat:  headers.findIndex(h=>h==='feature'||h==='feat'||h==='feature_name'),
     val:   headers.findIndex(h=>h==='custom_value'||h==='value'||h==='json'||h==='data'),
     modelId: headers.findIndex(h=>h==='model_id'||h==='modelid'||h==='model'),
     swVer:   headers.findIndex(h=>h==='sw_ver'||h==='swver'||h==='sw_version'||h==='software_version')
   };
-  if(idx.date<0||idx.time<0||idx.feat<0||idx.val<0)return[];
+  const hasDatetime=(idx.date>=0&&idx.time>=0)||idx.genTs>=0;
+  if(!hasDatetime||idx.feat<0||idx.val<0)return[];
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const parts=splitCSVRow(lines[i],sep);
-    const date=(parts[idx.date]||'').trim().replace(/^"|"$/g,'');
-    const time=(parts[idx.time]||'').trim().replace(/^"|"$/g,'');
+    let date,time;
+    if(idx.date>=0&&idx.time>=0){
+      date=(parts[idx.date]||'').trim().replace(/^"|"$/g,'');
+      time=(parts[idx.time]||'').trim().replace(/^"|"$/g,'');
+    } else {
+      const ts=(parts[idx.genTs]||'').trim().replace(/^"|"$/g,'');
+      // format: 2025-04-13 07:46:41.958 +0900
+      const m=ts.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})/);
+      date=m?m[1]:'';
+      time=m?m[2]:'';
+    }
     const feat=(parts[idx.feat]||'').trim().replace(/^"|"$/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
     let jsonStr=(parts[idx.val]||'').trim().replace(/^"|"$/g,'');
     if(!date||!time||!feat||!jsonStr)continue;
