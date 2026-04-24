@@ -857,7 +857,11 @@ function renderInsights(){
       dayD.sort((a,b)=>b.n-a.n);
       const avg=dayD.reduce((s,x)=>s+x.n,0)/dayD.length;
       const w=dayD[0];
-      if(w.n>=3&&w.n>=avg*2.2)items.push({lv:'info',t:`${w.d} DROP ${w.n}건 집중 — 평균(${avg.toFixed(1)}건) 대비 최다 발생일`});
+      if(w.n>=3&&w.n>=avg*2.2){
+        const [,mo,dy]=w.d.split('-');
+        const dateStr=`${parseInt(mo)}/${parseInt(dy)}일`;
+        items.push({lv:'info',t:`Calldrop 이벤트가 ${dateStr}에 집중(${w.n}건) — 평균 ${avg.toFixed(1)}건 대비 최다 발생`});
+      }
     }
   }
   // 13. 3G 통화 이력 (ACT_=2)
