@@ -726,7 +726,6 @@ function renderInsights(){
     const dr=totalDrop/totalCall*100;
     if(dr>=10)items.push({lv:'danger',t:`전체 DROP률 ${dr.toFixed(1)}% — 심각 수준 (기준: 10% 초과)`});
     else if(dr>=5)items.push({lv:'warn',t:`전체 DROP률 ${dr.toFixed(1)}% — 주의 (기준: 5% 초과)`});
-    else items.push({lv:'good',t:`전체 DROP률 ${dr.toFixed(1)}% — 양호`});
   }
   // 2. DROP 집중 기지국
   const stList=Object.values(stationMap);
@@ -804,7 +803,7 @@ function renderInsights(){
       const [topT,topN]=Object.entries(typeCnt).sort((a,b)=>b[1]-a[1])[0];
       const pct=Math.round(topN/total*100);
       const lblM={RSMT:'RSMT (Short Mute)',RNMT:'RNMT (수신없음)',DBMT:'DBMT (DL BLER)',UBMT:'UBMT (UL BLER)'};
-      if(pct>=60)items.push({lv:'info',t:`MUTE 원인의 ${pct}%가 ${lblM[topT]||topT} — ${topT.startsWith('R')?'수신측':'BLER 과다'} 집중`});
+      if(pct>=60)items.push({lv:'info',t:`MUTE 원인의 ${pct}%가 ${lblM[topT]||topT} — ${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'}`});
     }
   }
   // 8. 마이크이상 이벤트
@@ -855,7 +854,7 @@ function renderInsights(){
     const dayD=dates.map(d=>({d,n:byFeat('DROP',byDate(d)).length})).filter(x=>x.n>0);
     if(dayD.length>0){
       dayD.sort((a,b)=>b.n-a.n);
-      const avg=dayD.reduce((s,x)=>s+x.n,0)/dayD.length;
+      const avg=dayD.reduce((s,x)=>s+x.n,0)/dates.length;
       const w=dayD[0];
       if(w.n>=3&&w.n>=avg*2.2){
         const [,mo,dy]=w.d.split('-');
@@ -1155,7 +1154,7 @@ function renderDropTab(){
         +'<td>'+(r.PhID??'')+'</td><td>'+(r.DLCh??'')+'</td>'
         +'<td style="font-size:11px">'+siprCell+'</td>'
         +'<td>'+adCell+'</td>'
-        +'<td style="font-size:11px;color:#fff;white-space:normal;min-width:100px;line-height:1.6">'+noteCell+'</td></tr>';
+        +'<td style="font-size:11px;color:#222;white-space:normal;min-width:100px;line-height:1.6">'+noteCell+'</td></tr>';
     }).join('');
     html+='<div class="day-card">'
       +'<div class="day-hdr"><span class="day-dt">'+d+'</span>'
