@@ -516,6 +516,7 @@ function cnt(f,rows){return byFeat(f,rows).length;}
 function pct(n,d){return d===0?'0.0':((n/d)*100).toFixed(1);}
 function fNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
 function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;}
+function topVal(arr){if(!arr||!arr.length)return null;const cnt={};arr.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];}
 function isOne(v){return v==='1'||v===1;}
 function getCellKey(tac,pid,dch,lbnd){
   if(!tac&&!pid&&!dch&&!lbnd)return null;
@@ -731,7 +732,6 @@ function renderInsights(){
   const push=(lv,t,grp)=>items.push({lv,t,grp});
   const totalDrop=byFeat('DROP').length,totalCend=byFeat('CEND').length,totalCall=totalDrop+totalCend;
   const dates=getDates();
-  function topVal(arr){if(!arr.length)return null;const cnt={};arr.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];}
   const PATH_LBL={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
   const stList=Object.values(stationMap);
   const muteRows=byFeat('MUTE');
