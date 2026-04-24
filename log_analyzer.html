@@ -793,18 +793,27 @@ function renderInsights(){
   // 6. CP Crash
   const crshCnt=byFeat('CRSH').length;
   if(crshCnt>0)items.push({lv:'danger',t:`CP Crash ${crshCnt}회 발생 — 단말 안정성 이슈 확인 필요`});
-  // 7. MUTE 주요 원인
+  // 7. MUTE 주요 원인 + MUTE율 + 평균 전계
   const muteRows=byFeat('MUTE');
   if(muteRows.length>=2){
+    const muteRate=totalCend>0?(muteRows.length/totalCend*100).toFixed(1):'?';
+    const rsrpVals=muteRows.map(r=>parseFloat(r.RSRP??'')).filter(v=>!isNaN(v));
+    const sinrVals=muteRows.map(r=>parseFloat(r.CINR??r.SINR??'')).filter(v=>!isNaN(v));
+    const avgRsrpTxt=rsrpVals.length?` RSRP ${avgArr(rsrpVals).toFixed(1)}dBm`:'';
+    const avgSinrTxt=sinrVals.length?` SINR ${avgArr(sinrVals).toFixed(1)}dB`:'';
+    const sigTxt=(avgRsrpTxt||avgSinrTxt)?` [평균 전계:${avgRsrpTxt}${avgSinrTxt}]`:'';
     const typeCnt={};
     SOUND_TYPES.forEach(t=>{const n=muteRows.filter(r=>r[t.key]==='1'||r[t.key]===1).length;if(n>0)typeCnt[t.key]=n;});
-    const total=Object.values(typeCnt).reduce((s,n)=>s+n,0);
-    if(total>0){
+    const typeTotal=Object.values(typeCnt).reduce((s,n)=>s+n,0);
+    let causeTxt='';
+    if(typeTotal>0){
       const [topT,topN]=Object.entries(typeCnt).sort((a,b)=>b[1]-a[1])[0];
-      const pct=Math.round(topN/total*100);
+      const pct=Math.round(topN/typeTotal*100);
       const lblM={RSMT:'RSMT (Short Mute)',RNMT:'RNMT (수신없음)',DBMT:'DBMT (DL BLER)',UBMT:'UBMT (UL BLER)'};
-      if(pct>=60)items.push({lv:'info',t:`MUTE 원인의 ${pct}%가 ${lblM[topT]||topT} — ${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'}`});
+      if(pct>=60)causeTxt=` — 주요 원인 ${pct}%: ${lblM[topT]||topT} (${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'})`;
     }
+    const lv=parseFloat(muteRate)>=10?'warn':'info';
+    items.push({lv,t:`MUTE ${muteRows.length}건 (MUTE율 ${muteRate}%)${sigTxt}${causeTxt}`});
   }
   // 8. 마이크이상 이벤트
   const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
