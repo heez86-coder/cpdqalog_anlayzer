@@ -69,11 +69,11 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 
 /* 메트릭 카드 */
 .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:4px}
-.mc{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--blue-100);border-radius:var(--radius-sm);padding:14px 16px;box-shadow:var(--shadow-sm);transition:box-shadow .18s,border-left-color .18s}
+.mc{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--blue-100);border-radius:var(--radius-sm);padding:14px 16px;box-shadow:var(--shadow-sm);transition:box-shadow .18s,border-left-color .18s;min-width:0}
 .mc:hover{box-shadow:var(--shadow-md)}
 .ml{font-size:13px;color:var(--text-secondary);font-weight:700;margin-bottom:6px;letter-spacing:.02em}
 .mv{font-size:19px;font-weight:800;color:var(--text-primary);line-height:1.2}
-.ms{font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500}
+.ms{font-size:11px;color:#94a3b8;margin-top:4px;font-weight:500;word-break:break-word;overflow-wrap:break-word;line-height:1.45}
 .danger{border-left:4px solid var(--red)}.danger .mv{color:var(--red)}
 .warn{border-left:4px solid var(--orange)}.warn .mv{color:var(--orange)}
 
@@ -1085,7 +1085,7 @@ function renderNoti(){
     const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
     html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
   });
-  const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={issue:0,weak_sig:1,inter:2,high_bler:3};return(o[a.level]??9)-(o[b.level]??9)||(b.score-a.score);});
+  const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={issue:0,weak_sig:1,inter:2,high_bler:3};return(b.score-a.score)||((o[a.level]??9)-(o[b.level]??9));});
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER'};
   const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb'};
   stations.forEach(s=>{
@@ -1295,7 +1295,7 @@ function renderStationTable(){
     return true;
   });
   if(stSortCol==='default'||!colFn[stSortCol]){
-    all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.score-a.score));
+    all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
   } else {
     const fn=colFn[stSortCol];
     all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
