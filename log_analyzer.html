@@ -1284,7 +1284,7 @@ function renderStationTable(){
   const qPci=(document.getElementById('stPci').value||'').toLowerCase();
   const qBand=(document.getElementById('stBand').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
-  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.mutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp??-999,sinr:s=>s.avgSinr??-999,bler:s=>s.avgBler??-999};
+  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.nonMicMutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp,sinr:s=>s.avgSinr,bler:s=>s.avgBler};
   const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
@@ -1298,7 +1298,14 @@ function renderStationTable(){
     all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
   } else {
     const fn=colFn[stSortCol];
-    all.sort((a,b)=>stSortDir==='desc'?fn(b)-fn(a):fn(a)-fn(b));
+    all.sort((a,b)=>{
+      const va=fn(a),vb=fn(b);
+      const na=va===null||va===undefined,nb=vb===null||vb===undefined;
+      if(na&&nb)return 0;
+      if(na)return 1;
+      if(nb)return -1;
+      return stSortDir==='desc'?vb-va:va-vb;
+    });
   }
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
   const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb',normal:'tgr'};
