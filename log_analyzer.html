@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CpGdDqaLog 분석기</title>
+<title>CpGdDqaLog Analyzer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
@@ -201,7 +201,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 <div class="header-card">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <div style="flex:1;min-width:200px">
-      <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-.02em" id="logTitle">CpGdDqaLog Analyzer</div>
+      <div style="font-size:20px;font-weight:700;color:#fff;letter-spacing:-.02em" id="logTitle">CpGdDqaLog Analyzer <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.55);letter-spacing:0">v1.0</span></div>
       <div style="font-size:12px;color:rgba(255,255,255,0.75);font-weight:600;margin-top:3px" id="logPart">SQE2 Global 필드검증파트</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:3px" id="logSub">.LOG 파일을 업로드하여 분석을 시작하세요</div>
       <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:4px;display:none" id="modelVerLine"></div>
@@ -388,7 +388,7 @@ function resetAll(){
   document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
   document.getElementById('fileInput').value='';
-  document.getElementById('logTitle').textContent='CpGdDqaLog Analyzer';
+  document.getElementById('logTitle').innerHTML='CpGdDqaLog Analyzer <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.55);letter-spacing:0">v1.0</span>';
   document.getElementById('logPart').textContent='SQE2 Global 필드검증파트';
   document.getElementById('logSub').textContent='.LOG 파일을 업로드하여 분석을 시작하세요';
   document.getElementById('chipsetLine').textContent='';
@@ -637,7 +637,7 @@ function renderHeader(filename){
   const chipset=getChipset();
   const d0=dates[0].replace(/-/g,'/'),d1=dates[dates.length-1].replace(/-/g,'/');
   const op=getOperator();
-  document.getElementById('logTitle').textContent='CpGdDqa.LOG Analyzer';
+  document.getElementById('logTitle').innerHTML='CpGdDqa.LOG Analyzer <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.55);letter-spacing:0">v1.0</span>';
   document.getElementById('logSub').textContent=`${d0} ~ ${d1} (${dates.length}일치 데이터)`;
   // model_id / sw_ver (CSV 칼럼 또는 JSON 키)
   const getCI=(r,k)=>{const lo=k.toLowerCase();const key=Object.keys(r).find(x=>x.toLowerCase()===lo);return key?r[key]:undefined;};
