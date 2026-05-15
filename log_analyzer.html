@@ -252,8 +252,8 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
           <option value="high_bler">HighBLER</option><option value="normal">양호</option>
           <option value="antdiff">Ant Diff</option>
         </select>
-        <button class="btn" onclick="exportTop3Stations('csv')" title="상위 3개 기지국 CSV 저장"><i class="fa fa-download"></i> CSV 저장</button>
-        <button class="btn" onclick="exportTop3Stations('copy')" title="상위 3개 기지국 클립보드 복사"><i class="fa fa-copy"></i> 클립보드 복사</button>
+        <button class="btn" onclick="exportStationTable('csv')" title="기지국 테이블 CSV 저장"><i class="fa fa-download"></i> CSV 저장</button>
+        <button class="btn" onclick="exportStationTable('copy')" title="기지국 테이블 클립보드 복사"><i class="fa fa-copy"></i> 클립보드 복사</button>
       </div>
       <div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
       <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
@@ -1718,8 +1718,59 @@ function exportCSV(){
 function getTop3Stations(){
   const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   const all=Object.values(stationMap);
-  all.sort((a,b)=>(lvO[a.level]??9)-(lvO[b.level]??9)||(b.score-a.score));
+  all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
   return all.slice(0,3);
+}
+function exportStationTable(mode){
+  // renderStationTable과 동일한 필터·정렬 기준으로 전체 목록 생성
+  const qTac=(document.getElementById('stTac').value||'').toLowerCase();
+  const qPci=(document.getElementById('stPci').value||'').toLowerCase();
+  const qBand=(document.getElementById('stBand').value||'').toLowerCase();
+  const lv=document.getElementById('stFilter').value;
+  const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
+  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.nonMicMutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp,sinr:s=>s.avgSinr,bler:s=>s.avgBler};
+  let all=Object.values(stationMap).filter(s=>{
+    if(lv==='antdiff')return s.hasAntDiff;
+    if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
+    if(qTac&&!String(s.tac).toLowerCase().includes(qTac))return false;
+    if(qPci&&!String(s.pid).toLowerCase().includes(qPci))return false;
+    if(qBand&&!String(s.band||s.dch).toLowerCase().includes(qBand))return false;
+    return true;
+  });
+  if(stSortCol==='default'||!colFn[stSortCol]){
+    all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
+  } else {
+    const fn=colFn[stSortCol];
+    all.sort((a,b)=>{
+      const va=fn(a),vb=fn(b);
+      const na=va===null||va===undefined,nb=vb===null||vb===undefined;
+      if(na&&nb)return 0;if(na)return 1;if(nb)return -1;
+      return stSortDir==='desc'?vb-va:va-vb;
+    });
+  }
+  if(!all.length){alert('기지국 데이터가 없습니다.');return;}
+  const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
+  const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
+  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
+  const rows=all.map((s,i)=>{
+    const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    const plmnDisp=plmnRaw?(PLMN_OP[plmnRaw]?plmnRaw+'('+PLMN_OP[plmnRaw]+')':plmnRaw):'';
+    const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
+    const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
+    const tacDec=s.tac?parseInt(s.tac,16):NaN;
+    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-'];
+  });
+  if(mode==='csv'){
+    const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
+    const csv=[hdrs.map(esc).join(','),...rows.map(r=>r.map(esc).join(','))].join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+    a.download='stations.csv';a.click();
+  } else {
+    const lines=[hdrs.join('\t'),...rows.map(r=>r.join('\t'))].join('\n');
+    navigator.clipboard.writeText(lines).then(()=>alert('기지국 목록이 클립보드에 복사되었습니다.')).catch(()=>alert('클립보드 접근 권한이 필요합니다.'));
+  }
 }
 function exportTop3Stations(mode){
   const top3=getTop3Stations();
