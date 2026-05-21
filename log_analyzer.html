@@ -1768,8 +1768,19 @@ function exportStationTable(mode){
     a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
     a.download='stations.csv';a.click();
   } else {
-    const lines=[hdrs.join('\t'),...rows.map(r=>r.join('\t'))].join('\n');
-    navigator.clipboard.writeText(lines).then(()=>alert('기지국 목록이 클립보드에 복사되었습니다.')).catch(()=>alert('클립보드 접근 권한이 필요합니다.'));
+    copyTableToClipboard(hdrs,rows,'기지국 목록이 클립보드에 복사되었습니다.');
+  }
+}
+function copyTableToClipboard(hdrs,rows,successMsg){
+  const esc=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const htmlTable='<table><thead><tr>'+hdrs.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+  const plain=[hdrs.join('\t'),...rows.map(r=>r.join('\t'))].join('\n');
+  if(navigator.clipboard&&window.ClipboardItem){
+    navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([htmlTable],{type:'text/html'}),'text/plain':new Blob([plain],{type:'text/plain'})})]).then(()=>alert(successMsg)).catch(()=>{
+      navigator.clipboard.writeText(plain).then(()=>alert(successMsg)).catch(()=>alert('클립보드 접근 권한이 필요합니다.'));
+    });
+  } else {
+    navigator.clipboard.writeText(plain).then(()=>alert(successMsg)).catch(()=>alert('클립보드 접근 권한이 필요합니다.'));
   }
 }
 function exportTop3Stations(mode){
@@ -1794,8 +1805,7 @@ function exportTop3Stations(mode){
     a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
     a.download='top3_stations.csv';a.click();
   } else {
-    const lines=[hdrs.join('\t'),...rows.map(r=>r.join('\t'))].join('\n');
-    navigator.clipboard.writeText(lines).then(()=>alert('상위 3개 기지국 내용이 클립보드에 복사되었습니다.')).catch(()=>alert('클립보드 접근 권한이 필요합니다.'));
+    copyTableToClipboard(hdrs,rows,'상위 3개 기지국 내용이 클립보드에 복사되었습니다.');
   }
 }
 function showTab(name){
