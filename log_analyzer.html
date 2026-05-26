@@ -1301,8 +1301,8 @@ async function fetchNetaStation(plmn,tac,pci,dlch){
   const timer=setTimeout(()=>ctrl.abort(),4000);
   const tacDec=parseInt(tac,16)||tac;
   const operator=PLMN_OP[plmn]||plmn;
-  const p=new URLSearchParams({operator,tac:tacDec,pci,dlch});
-  const url=`${NETA_BASE}/api/stations-trend?${p}`;
+  const p=new URLSearchParams({operator,pci,dlch});
+  const url=`${NETA_BASE}/api/stations/${tacDec}/trend?${p}`;
   try{
     const res=await fetch(url,{signal:ctrl.signal});
     clearTimeout(timer);
