@@ -302,6 +302,7 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 
 <script>
 let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
+let netaCache={}; // key: `${tacDec}|${pci}|${dlch}` → {data} | {promise}
 const RP=50;let charts=[];
 const SOUND_TYPES=[
   {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김',cat:'rx'},
@@ -405,7 +406,7 @@ function handleFile(file){
 }
 function loadSample(){doParse(SAMPLE,'sample.LOG');}
 function resetAll(){
-  allRows=[];allRlfEvents=[];rlfByRlfi={};charts.forEach(c=>c.destroy());charts=[];
+  allRows=[];allRlfEvents=[];rlfByRlfi={};netaCache={};charts.forEach(c=>c.destroy());charts=[];
   document.getElementById('dashboard').style.display='none';
   document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
@@ -525,6 +526,7 @@ function doParse(text,filename){
   buildRlfEvents();
   stSortCol='default';stSortDir='desc';rawOpenIdx=new Set();
   renderHeader(filename);renderInsights();renderOverview();renderMuteTab();renderDropTab();renderDaily();
+  prefetchTop3Neta();
   tlOpen=false;const tlW=document.getElementById('tlWrap');if(tlW)tlW.style.display='block';
   const tlB=document.getElementById('tlBody');if(tlB)tlB.style.display='none';
   const tlC=document.getElementById('tlChevron');if(tlC)tlC.textContent='▼';
@@ -1301,11 +1303,19 @@ function renderDropTab(){
   });
   document.getElementById('dropContent').innerHTML=html;
 }
-async function fetchNetaStation(plmn,tac,pci,band,dch){
+function netaResolve(plmn,tac,pci,band,dch){
   const tacDec=parseInt(tac,16)||tac;
   const operator=PLMN_OP[plmn]||plmn;
-  // 밴드번호 → 대표 dlch 변환, 없으면 raw dch 사용
-  const dlch=BAND_DLCH_MAP[operator]?.[band]??dch??band;
+  const dlch=BAND_DLCH_MAP[operator]?.[String(band)]??dch??band;
+  return{tacDec,operator,dlch,cacheKey:`${tacDec}|${pci}|${dlch}`};
+}
+async function fetchNetaStation(plmn,tac,pci,band,dch){
+  const {tacDec,operator,dlch,cacheKey}=netaResolve(plmn,tac,pci,band,dch);
+  // 캐시 히트
+  if(netaCache[cacheKey]?.data!==undefined)return netaCache[cacheKey].data;
+  // 동일 요청 중복 방지 — 진행 중인 promise 반환
+  if(netaCache[cacheKey]?.promise)return netaCache[cacheKey].promise;
+
   const q=new URLSearchParams({operator,tac:tacDec,pci,dlch});
   const urlInfo=`${NETA_BASE}/api/stations?${q}`;
   const urlTrend=`${NETA_BASE}/api/stations/${tacDec}/trend?${new URLSearchParams({operator,pci,dlch})}`;
@@ -1319,13 +1329,32 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
       return await res.json();
     }catch(e){
       clearTimeout(timer);
-      const reason=e.name==='AbortError'?'타임아웃':e.message||String(e);
+      const reason=e.name==='AbortError'?'타임아웃(3분)':e.message||String(e);
       console.error('[NETA]',url,'실패:',reason);
       return{_fetchErr:reason,_url:url};
     }
   };
-  const [info,trend]=await Promise.all([doFetch(urlInfo),doFetch(urlTrend)]);
-  return{info,trend,_urlInfo:urlInfo,_urlTrend:urlTrend};
+  const promise=Promise.all([doFetch(urlInfo),doFetch(urlTrend)]).then(([info,trend])=>{
+    const result={info,trend,_urlInfo:urlInfo,_urlTrend:urlTrend};
+    netaCache[cacheKey]={data:result};
+    return result;
+  });
+  netaCache[cacheKey]={promise};
+  return promise;
+}
+function prefetchTop3Neta(){
+  getTop3Stations().forEach(s=>{
+    const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    fetchNetaStation(plmn,s.tac,s.pid,s.band||'',s.dch||'').then(result=>{
+      // 확장 행이 이미 로딩 상태로 열려있으면 결과로 교체
+      const expRow=document.querySelector(`[data-neta-exp="${CSS.escape(s.key)}"]`);
+      if(expRow){
+        if(expRow._ticker)clearInterval(expRow._ticker);
+        expRow.innerHTML=`<td colspan="15">${buildNetaPanel(result,plmn,s.tac,s.pid)}</td>`;
+      }
+    });
+  });
 }
 function buildNetaPanel(result,plmn,tac,pci,dlch){
   if(!result)return`<div class="neta-offline">⚠ NETA 응답 없음</div>`;
@@ -1343,10 +1372,15 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   }
 
   // 기본 정보 소스: info 우선, 없으면 trend 최신 항목에서 추출 (에러 객체 제외)
+  const tacDec=parseInt(tac,16)||tac;
   const validInfo=info&&!info._fetchErr?info:null;
-  const validTrend=Array.isArray(trend)?trend:(trend&&!trend._fetchErr?null:null);
-  const trendLatest=validTrend&&validTrend.length?validTrend[validTrend.length-1]:null;
-  const src=Array.isArray(validInfo)&&validInfo.length?validInfo[0]:(validInfo&&!Array.isArray(validInfo)?validInfo:trendLatest);
+  const validTrend=Array.isArray(trend)&&!trend._fetchErr?trend:null;
+  const trendLatest=validTrend?.length?validTrend[validTrend.length-1]:null;
+  // tac+pci로 해당 기지국 항목만 매칭 (info가 전체 목록 반환 시 오정합 방지)
+  const infoArr=Array.isArray(validInfo)?validInfo:(validInfo?[validInfo]:[]);
+  const matchedInfo=infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))??infoArr[0]??null;
+  // trend 데이터가 기지국 특정 조회라서 우선순위 높음
+  const src=trendLatest??matchedInfo;
 
   let html='<div class="neta-panel">';
 
@@ -1412,18 +1446,25 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
 async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   const next=tr.nextElementSibling;
   if(next&&next.classList.contains('neta-expand-row')){
+    if(next._ticker)clearInterval(next._ticker);
     next.remove();tr.classList.remove('expanded');return;
   }
   tr.classList.add('expanded');
   const expRow=document.createElement('tr');
   expRow.className='neta-expand-row';
-  const loadId='neta-load-'+Date.now();
-  expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초 (서버 응답이 느릴 수 있습니다)</div></td>`;
+  // 캐시 확인 — 있으면 바로 표시
+  const {cacheKey}=netaResolve(plmn,tac,pci,band,dch);
+  if(netaCache[cacheKey]?.data){
+    expRow.innerHTML=`<td colspan="15">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci)}</td>`;
+    tr.after(expRow);return;
+  }
+  const loadId='nl-'+Date.now();
+  expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초</div></td>`;
   tr.after(expRow);
   let sec=0;
-  const ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;},1000);
+  expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
   const data=await fetchNetaStation(plmn,tac,pci,band,dch);
-  clearInterval(ticker);
+  clearInterval(expRow._ticker);
   expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
 }
 function renderStationTable(){
@@ -1494,7 +1535,7 @@ function renderStationTable(){
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
     const isTop3=i<3;
-    const netaAttr=isTop3?` class="neta-clickable" title="클릭하면 NETA 기지국 상세정보를 조회합니다" onclick="toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}')"`:' ';
+    const netaAttr=isTop3?` class="neta-clickable" data-neta-key="${s.key}" title="클릭하면 NETA 기지국 상세정보를 닫습니다" onclick="toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}')"`:' ';
     return`<tr${netaAttr}>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
@@ -1510,6 +1551,28 @@ function renderStationTable(){
     </tr>`;
   }).join(''):'<tr><td colspan="15" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
+  // 상위 3개 기지국 자동 확장 (캐시 있으면 즉시, 없으면 로딩 상태)
+  all.slice(0,3).forEach(s=>{
+    const tr=document.querySelector(`[data-neta-key="${CSS.escape(s.key)}"]`);
+    if(!tr)return;
+    tr.classList.add('expanded');
+    const expRow=document.createElement('tr');
+    expRow.className='neta-expand-row';
+    expRow.setAttribute('data-neta-exp',s.key);
+    const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    const {cacheKey}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
+    const cached=netaCache[cacheKey]?.data;
+    if(cached){
+      expRow.innerHTML=`<td colspan="15">${buildNetaPanel(cached,plmn,s.tac,s.pid)}</td>`;
+    }else{
+      let sec=0;
+      const loadId='nl-'+Math.random().toString(36).slice(2);
+      expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 조회 중… <span id="${loadId}">0</span>초</div></td>`;
+      expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
+    }
+    tr.after(expRow);
+  });
 }
 function renderDaily(){
   const dates=getDates();let html='';
