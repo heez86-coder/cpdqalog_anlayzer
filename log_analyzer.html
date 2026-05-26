@@ -182,6 +182,21 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 .i-info{background:#eef4ff;border-left-color:#2980b9;color:#1a4870}
 .i-good{background:#f0faf3;border-left-color:#1e8449;color:#1a5235}
 .i-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:5px}
+/* NETA 확장 패널 */
+.neta-expand-row td{padding:0!important;background:#f0f7ff!important}
+.neta-panel{padding:14px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%)}
+.neta-section{flex:1;min-width:180px}
+.neta-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.neta-value{font-size:13px;color:#1e293b;line-height:1.6}
+.neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%}
+.neta-trend-tbl th{background:#dbeafe;color:#1a4080;padding:3px 8px;text-align:center;font-weight:600}
+.neta-trend-tbl td{padding:3px 8px;text-align:center;border-bottom:1px solid #e2e8f0}
+.neta-loading{color:#64748b;font-size:12px;padding:12px 20px}
+.neta-offline{color:#b45309;font-size:12px;padding:12px 20px;background:#fffbeb;border-top:2px solid #f59e0b}
+tr.neta-clickable{cursor:pointer}
+tr.neta-clickable:hover td{filter:brightness(0.96)}
+tr.neta-clickable td:first-child::after{content:' ▾';font-size:10px;color:#94a3b8;display:inline-block}
+tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 /* 타임라인 */
 #tlWrap{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);margin-bottom:10px;overflow:hidden}
 .tl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--blue-50);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text-primary);cursor:pointer}
@@ -313,6 +328,9 @@ const USER_TYPES=[
 ];
 const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'ESM LOWER LAYER FAILURE','273':'LTE NAS SERVICE REQ FAILURE NO THROTTLE','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','308':'ESM PROC TIMEOUT','405':'DRB Release by NW','901':'NO RA FROM NW','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
 const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
+// ── NETA 연동 설정 ──────────────────────────────────────
+const NETA_BASE='http://10.246.56.50:8000';
+const NETA_ENDPOINT='/api/station'; // ※ 실제 NETA API 경로가 다를 경우 여기만 수정
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 10:05:33 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-105","RxP1":"-108","SNR0":"-2","SNR1":"-3"}
@@ -1279,6 +1297,53 @@ function renderDropTab(){
   });
   document.getElementById('dropContent').innerHTML=html;
 }
+async function fetchNetaStation(plmn,tac,pci,band){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),4000);
+  try{
+    const p=new URLSearchParams({plmn,tac,pci,band});
+    const res=await fetch(`${NETA_BASE}${NETA_ENDPOINT}?${p}`,{signal:ctrl.signal});
+    clearTimeout(timer);
+    if(!res.ok)return null;
+    return await res.json();
+  }catch{clearTimeout(timer);return null;}
+}
+function buildNetaPanel(data,plmn,tac,pci,band){
+  if(!data)return`<div class="neta-offline">⚠ NETA 서버(${NETA_BASE})에 접속할 수 없습니다 — 사내 네트워크 연결을 확인하세요</div>`;
+  const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let html='<div class="neta-panel">';
+  const addr=data.address??data.addr??data.location??data.address_full??'';
+  html+=`<div class="neta-section"><div class="neta-label">📍 상세 주소</div><div class="neta-value">${esc(addr)||'-'}</div></div>`;
+  const lat=data.lat??data.latitude??data.y??null;
+  const lng=data.lng??data.longitude??data.x??null;
+  if(lat!=null&&lng!=null){
+    const kakaoUrl=`https://map.kakao.com/link/map/${encodeURIComponent('TAC'+tac+'/PCI'+pci)},${lat},${lng}`;
+    html+=`<div class="neta-section"><div class="neta-label">🗺 지도</div><div class="neta-value"><a href="${kakaoUrl}" target="_blank" style="color:#2980b9;font-weight:600;text-decoration:none">카카오맵에서 보기 ↗</a><br><span style="font-size:11px;color:#64748b">위도 ${lat} / 경도 ${lng}</span></div></div>`;
+  }
+  const trend=data.weekly_trend??data.trend??data.weeklyTrend??[];
+  if(trend.length){
+    html+='<div class="neta-section" style="flex:2;min-width:260px"><div class="neta-label">📈 주간 트렌드</div><table class="neta-trend-tbl"><thead><tr><th>날짜</th><th>DROP</th><th>MUTE</th><th>RLF</th></tr></thead><tbody>';
+    trend.slice(-7).forEach(r=>{
+      html+=`<tr><td>${esc(r.date??r.Date??'')}</td><td>${esc(r.drop??r.DROP??0)}</td><td>${esc(r.mute??r.MUTE??0)}</td><td>${esc(r.rlf??r.RLF??0)}</td></tr>`;
+    });
+    html+='</tbody></table></div>';
+  }
+  html+='</div>';
+  return html;
+}
+async function toggleNetaRow(tr,plmn,tac,pci,band){
+  const next=tr.nextElementSibling;
+  if(next&&next.classList.contains('neta-expand-row')){
+    next.remove();tr.classList.remove('expanded');return;
+  }
+  tr.classList.add('expanded');
+  const expRow=document.createElement('tr');
+  expRow.className='neta-expand-row';
+  expRow.innerHTML='<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중…</div></td>';
+  tr.after(expRow);
+  const data=await fetchNetaStation(plmn,tac,pci,band);
+  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,band)}</td>`;
+}
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
   const qPci=(document.getElementById('stPci').value||'').toLowerCase();
@@ -1346,7 +1411,9 @@ function renderStationTable(){
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
-    return`<tr>
+    const isTop3=i<3;
+    const netaAttr=isTop3?` class="neta-clickable" title="클릭하면 NETA 기지국 상세정보를 조회합니다" onclick="toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||s.dch}')"`:' ';
+    return`<tr${netaAttr}>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
       <td>${plmnDisp}</td><td>${actDisp}</td>
