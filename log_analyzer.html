@@ -330,7 +330,6 @@ const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'
 const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
 // ── NETA 연동 설정 ──────────────────────────────────────
 const NETA_BASE='http://10.246.56.50:8000';
-const NETA_ENDPOINT='/api/station'; // ※ 실제 NETA API 경로가 다를 경우 여기만 수정
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 10:05:33 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-105","RxP1":"-108","SNR0":"-2","SNR1":"-3"}
@@ -1297,29 +1296,29 @@ function renderDropTab(){
   });
   document.getElementById('dropContent').innerHTML=html;
 }
-async function fetchNetaStation(plmn,tac,pci,band){
+async function fetchNetaStation(plmn,tac,pci,dlch){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),4000);
+  const tacDec=parseInt(tac,16)||tac;
+  const operator=PLMN_OP[plmn]||plmn;
+  const p=new URLSearchParams({operator,pci,dlch});
+  const url=`${NETA_BASE}/api/stations/${tacDec}/trend?${p}`;
   try{
-    const p=new URLSearchParams({plmn,tac,pci,band});
-    const url=`${NETA_BASE}${NETA_ENDPOINT}?${p}`;
     const res=await fetch(url,{signal:ctrl.signal});
     clearTimeout(timer);
     if(!res.ok)return{_err:`HTTP ${res.status} ${res.statusText}`,_url:url};
     return await res.json();
   }catch(e){
     clearTimeout(timer);
-    const p=new URLSearchParams({plmn,tac,pci,band});
-    const url=`${NETA_BASE}${NETA_ENDPOINT}?${p}`;
     const reason=e.name==='AbortError'?'타임아웃(4s 초과)':e.message||String(e);
     console.error('[NETA] fetch 실패:',reason,'URL:',url,e);
     return{_err:reason,_url:url};
   }
 }
-function buildNetaPanel(data,plmn,tac,pci,band){
+function buildNetaPanel(data,plmn,tac,pci,dlch){
   if(!data||data._err){
     const reason=data?._err||'알 수 없는 오류';
-    const url=data?._url||`${NETA_BASE}${NETA_ENDPOINT}`;
+    const url=data?._url||NETA_BASE;
     return`<div class="neta-offline">⚠ NETA 조회 실패: <b>${reason}</b><br><span style="font-size:11px;opacity:.8">요청 URL: ${url}<br>브라우저 개발자도구(F12) → Console/Network 탭에서 상세 오류를 확인하세요</span></div>`;
   }
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1343,7 +1342,7 @@ function buildNetaPanel(data,plmn,tac,pci,band){
   html+='</div>';
   return html;
 }
-async function toggleNetaRow(tr,plmn,tac,pci,band){
+async function toggleNetaRow(tr,plmn,tac,pci,dlch){
   const next=tr.nextElementSibling;
   if(next&&next.classList.contains('neta-expand-row')){
     next.remove();tr.classList.remove('expanded');return;
@@ -1353,8 +1352,8 @@ async function toggleNetaRow(tr,plmn,tac,pci,band){
   expRow.className='neta-expand-row';
   expRow.innerHTML='<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중…</div></td>';
   tr.after(expRow);
-  const data=await fetchNetaStation(plmn,tac,pci,band);
-  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,band)}</td>`;
+  const data=await fetchNetaStation(plmn,tac,pci,dlch);
+  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,dlch)}</td>`;
 }
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
