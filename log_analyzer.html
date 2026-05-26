@@ -108,20 +108,6 @@ body{font-family:"Pretendard",-apple-system,BlinkMacSystemFont,'Segoe UI',sans-s
 .tgr{background:var(--green-bg);color:var(--green)}
 .ttl{background:var(--teal-bg);color:var(--teal)}
 .tpk{background:var(--pink-bg);color:var(--pink)}
-/* 이상지수 배지 (NETA 스타일) */
-.anl-critical{background:#fee2e2;color:#dc2626}
-.anl-high{background:#ffedd5;color:#ea580c}
-.anl-medium{background:#fef9c3;color:#ca8a04}
-.anl-low{background:#dcfce7;color:#16a34a}
-.anomaly-bar-wrap{background:#e2e8f0;border-radius:4px;height:5px;width:60px;display:inline-block;overflow:hidden;vertical-align:middle;margin-left:4px}
-.anomaly-bar{height:5px;border-radius:4px}
-#station-split{display:flex;gap:12px;align-items:flex-start}
-#station-table-panel{flex:1;min-width:0;overflow:hidden}
-#station-map-panel{width:440px;flex-shrink:0;display:flex;flex-direction:column;gap:6px}
-#station-leaflet-map{height:480px;border-radius:var(--radius-sm);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
-.leaflet-popup-content-wrapper{border-radius:10px!important;box-shadow:0 4px 16px rgba(31,69,137,.18)!important}
-.leaflet-popup-content{font-family:"Pretendard",-apple-system,sans-serif!important;font-size:12px!important}
-tr.st-row-selected td{background:#eff6ff!important}
 
 /* 테이블 */
 .tw{overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
@@ -213,6 +199,25 @@ tr.neta-clickable{cursor:pointer}
 tr.neta-clickable:hover td{filter:brightness(0.96)}
 tr.neta-clickable td:first-child::after{content:' ▾';font-size:10px;color:#94a3b8;display:inline-block}
 tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
+/* ── NETA 패널 개선 (v3) ─────────────────────────────────── */
+.neta-panel{padding:14px 20px;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%)}
+.neta-loc-section{min-width:200px;max-width:280px;flex-shrink:0}
+.neta-cards-section{flex:2;min-width:380px}
+.neta-trend-section{flex:3;min-width:340px}
+.neta-ref-section{flex-basis:100%;padding-top:10px;border-top:1px solid #dbeafe}
+.neta-vendor-badge{font-size:11px;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:10px;margin-left:4px}
+.neta-leaflet-mini{height:150px;border-radius:8px;border:1px solid var(--border);margin-top:8px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.neta-info-cards{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.neta-info-card{flex:1;min-width:68px;padding:8px 10px;border-radius:8px;text-align:center}
+.neta-card-label{font-size:10px;font-weight:700;letter-spacing:.04em}
+.neta-card-value{font-size:17px;font-weight:800;line-height:1.2;margin:3px 0}
+.neta-sparkline{width:100%;height:26px;display:block}
+.neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%;margin-top:6px}
+.neta-trend-tbl th{background:var(--blue-800);color:#fff;padding:4px 8px;text-align:center;font-size:11px;font-weight:700}
+.neta-trend-tbl td{padding:4px 8px;text-align:center;border-bottom:1px solid #e2e8f0}
+.neta-trend-tbl tr:hover td{background:#f0f5fb}
+/* 참고 배지 */
+.neta-ref-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin:2px 3px 2px 0}
 /* 타임라인 */
 #tlWrap{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);margin-bottom:10px;overflow:hidden}
 .tl-head{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--blue-50);border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text-primary);cursor:pointer}
@@ -278,33 +283,19 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
         <input type="text" id="stPci" placeholder="PCI" oninput="renderStationTable()" style="width:90px">
         <input type="text" id="stBand" placeholder="Band" oninput="renderStationTable()" style="width:90px">
         <select id="stFilter" onchange="renderStationTable()">
-          <option value="">전체</option>
-          <option value="CRITICAL">🚨 CRITICAL</option>
-          <option value="HIGH">🔴 HIGH</option>
-          <option value="MEDIUM">🟡 MEDIUM</option>
-          <option value="LOW">🟢 LOW</option>
-          <option value="weak_sig">신호세기미약</option>
-          <option value="inter">셀중첩간섭</option>
-          <option value="high_bler">HighBLER</option>
+          <option value="">전체</option><option value="issue">이슈집중</option>
+          <option value="weak_sig">신호세기미약</option><option value="inter">셀중첩간섭</option>
+          <option value="high_bler">HighBLER</option><option value="normal">양호</option>
           <option value="antdiff">Ant Diff</option>
         </select>
         <button class="btn" onclick="exportStationTable('csv')" title="기지국 테이블 CSV 저장"><i class="fa fa-download"></i> CSV 저장</button>
         <button class="btn" onclick="exportTop3Stations('copy')" title="상위 3개 기지국 클립보드 복사"><i class="fa fa-copy"></i> 클립보드 복사</button>
-        <button class="btn" onclick="document.getElementById('locationCsvInput').click()" title="위치 데이터 CSV 업로드 (TAC,PCI,lat,lng)"><i class="fa fa-map-marker-alt"></i> 위치 CSV</button>
+        <button class="btn" onclick="document.getElementById('locationCsvInput').click()" title="위치 데이터 CSV (TAC,PCI,lat,lng) — NETA 패널 지도 표시용"><i class="fa fa-map-marker-alt"></i> 위치 CSV</button>
         <input type="file" id="locationCsvInput" accept=".csv" style="display:none" onchange="loadLocationCSV(event)">
         <span id="locationLoadedHint" style="font-size:11px;color:var(--green);display:none"><i class="fa fa-check-circle"></i> 위치 데이터 로드됨</span>
       </div>
-      <div id="station-split">
-        <div id="station-table-panel">
-          <div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
-          <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
-        </div>
-        <div id="station-map-panel">
-          <div id="station-leaflet-map"></div>
-          <div id="stMapHint" style="text-align:center;padding:6px 0;font-size:11px;color:#94a3b8"><i class="fa fa-info-circle"></i> 위치 CSV 업로드 후 기지국 위치가 지도에 표시됩니다<br><span style="color:#b0bec5">형식: TAC,PCI,lat,lng (헤더 포함)</span></div>
-          <div id="stMapDetail" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:12px;margin-top:6px"></div>
-        </div>
-      </div>
+      <div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
+      <div style="font-size:12px;color:#aaa;margin-top:8px" id="stCount"></div>
     </div>
     <div id="tab-mute" style="display:none"><div id="muteContent"></div></div>
     <div id="tab-drop" style="display:none"><div id="dropContent"></div></div>
@@ -1403,8 +1394,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   if(!result)return`<div class="neta-offline">⚠ NETA 응답 없음</div>`;
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const {info,trend,_urlInfo,_urlTrend}=result;
-  const infoErr=info?._fetchErr, trendErr=trend?._fetchErr;
-  // 둘 다 실패하면 진단 메시지 표시
+  const infoErr=info?._fetchErr,trendErr=trend?._fetchErr;
   if(infoErr&&trendErr){
     return`<div class="neta-offline">⚠ NETA 조회 실패<br>
       <span style="font-size:11px;line-height:1.8">
@@ -1413,79 +1403,122 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
         <span style="color:#92400e">CORS 차단이면 NETA 백엔드에 CORS 허용 설정이 필요합니다.</span>
       </span></div>`;
   }
-
-  // 기본 정보 소스: info 우선, 없으면 trend 최신 항목에서 추출 (에러 객체 제외)
   const tacDec=parseInt(tac,16)||tac;
   const validInfo=info&&!info._fetchErr?info:null;
   const validTrend=Array.isArray(trend)&&!trend._fetchErr?trend:null;
   const trendLatest=validTrend?.length?validTrend[validTrend.length-1]:null;
-  // tac+pci로 해당 기지국 항목만 매칭 (info가 전체 목록 반환 시 오정합 방지)
   const infoArr=Array.isArray(validInfo)?validInfo:(validInfo?[validInfo]:[]);
   const matchedInfo=infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))??infoArr[0]??null;
-  // trend 데이터가 기지국 특정 조회라서 우선순위 높음
   const src=trendLatest??matchedInfo;
 
-  let html='<div class="neta-panel">';
+  // ── 참고 태그 추출 & 전역 캐시 저장
+  const refTags=[];
+  if(matchedInfo){
+    const fi=matchedInfo;
+    if(fi.pci_conflict||fi.has_pci_duplicate||(fi.pci_conflict_count>0))
+      refTags.push({text:'중복 PCI 존재',color:'#2a5aaf'});
+    if(fi.tau_reject||fi.has_tau_reject||(fi.tau_reject_count>0))
+      refTags.push({text:'TAU Reject 발생지역',color:'#be123c'});
+    if(fi.repeater_issue||fi.has_repeater||fi.repeater_type)
+      refTags.push({text:'Repeater 불량의심',color:'#b45309'});
+    if(fi.fa_date||fi.has_fa||fi.fa_info)
+      refTags.push({text:'FA 현장점검',color:'#15803d'});
+    if(fi.notes&&typeof fi.notes==='string')
+      refTags.push({text:fi.notes,color:'#475569'});
+    if(fi.reference&&typeof fi.reference==='string')
+      refTags.push({text:fi.reference,color:'#475569'});
+  }
+  const {cacheKey}=netaResolve(plmn,tac,pci,matchedInfo?.band||'',matchedInfo?.dlch||dlch||'');
+  netaRefTagCache[cacheKey]=refTags;
 
-  // 기지국 기본 정보
+  const uid='np'+Date.now();
+  let h='<div class="neta-panel">';
+
+  // ── Section 1: 주소 / 위치 + 소형 Leaflet 지도
   if(src){
     const region=src.region||'-';
-    const vendor=src.vendor?`<span style="font-size:11px;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:10px;margin-left:6px">${esc(src.vendor)}</span>`:'';
+    const vendor=src.vendor?`<span class="neta-vendor-badge">${esc(src.vendor)}</span>`:'';
     const cid=src.cid?`<br><span style="font-size:11px;color:#64748b">CID: ${esc(src.cid)}</span>`:'';
-    html+=`<div class="neta-section"><div class="neta-label">📍 주소</div><div class="neta-value">${esc(region)}${vendor}${cid}</div></div>`;
-
-    const lat=src.lat??null, lng=src.lng??null;
-    if(lat!=null&&lng!=null){
-      const kakaoUrl=`https://map.kakao.com/link/map/${encodeURIComponent('TAC'+tac+'/PCI'+pci)},${lat},${lng}`;
-      html+=`<div class="neta-section" style="min-width:130px;max-width:170px"><div class="neta-label">🗺 지도</div><div class="neta-value"><a href="${kakaoUrl}" target="_blank" style="color:#2980b9;font-weight:600;text-decoration:none">카카오맵 ↗</a><br><span style="font-size:11px;color:#64748b">${lat}, ${lng}</span></div></div>`;
-    }
-
-    // 최신 주 현황 요약 카드
-    const cur=trendLatest||src;
-    if(cur.device_cnt!=null||cur.call_cnt!=null){
-      const scoreColor=s=>s>=700?'#c0392b':s>=400?'#b7640a':'#1e8449';
-      const sc=cur.anomaly_score??0;
-      html+=`<div class="neta-section" style="min-width:160px;max-width:200px"><div class="neta-label">📊 최신 현황 (${cur.year}-W${cur.week})</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;margin-top:4px">
-          <span style="color:#64748b">단말수</span><span style="font-weight:600">${esc(cur.device_cnt??'-')}</span>
-          <span style="color:#64748b">콜수</span><span style="font-weight:600">${esc(cur.call_cnt??'-')}</span>
-          <span style="color:#64748b">DROP</span><span style="font-weight:600;color:${cur.drop_cnt>0?'#c0392b':'inherit'}">${esc(cur.drop_cnt??0)}</span>
-          <span style="color:#64748b">No-RTP</span><span style="font-weight:600;color:${cur.no_rtp_cnt>0?'#b7640a':'inherit'}">${esc(cur.no_rtp_cnt??0)}</span>
-          <span style="color:#64748b">RLF</span><span style="font-weight:600;color:${cur.rlf_cnt>0?'#1a6fa0':'inherit'}">${esc(cur.rlf_cnt??0)}</span>
-          <span style="color:#64748b">이상점수</span><span style="font-weight:700;color:${scoreColor(sc)}">${sc.toFixed?sc.toFixed(1):sc}</span>
-        </div></div>`;
-    }
+    const lat=src.lat??null,lng=src.lng??null;
+    const locSrc=lat!=null&&lng!=null?`<div style="font-size:11px;color:#94a3b8;margin-top:2px">${lat}, ${lng}</div>`:'';
+    const mapDiv=lat!=null&&lng!=null?`<div id="${uid}-map" class="neta-leaflet-mini"></div>`:'';
+    const kakaoLnk=lat!=null&&lng!=null?`<a href="https://map.kakao.com/link/map/${encodeURIComponent('TAC'+tac+'/PCI'+pci)},${lat},${lng}" target="_blank" style="font-size:11px;color:#2980b9;text-decoration:none">카카오맵 ↗</a>`:'';
+    h+=`<div class="neta-section neta-loc-section">
+      <div class="neta-label">📍 주소 / 위치</div>
+      <div class="neta-value" style="font-weight:600">${esc(region)}${vendor}${cid}</div>
+      ${locSrc}${kakaoLnk}${mapDiv}
+    </div>`;
+    if(lat!=null&&lng!=null)setTimeout(()=>initNetaMiniMap(`${uid}-map`,lat,lng),80);
   }
 
-  // 주간 트렌드 테이블
+  // ── Section 2: 스파크라인 현황 카드
+  if(src&&(src.device_cnt!=null||src.rlf_cnt!=null)){
+    const scoreColor=s=>s>=700?'#dc2626':s>=400?'#b45309':'#16a34a';
+    const sc=src.anomaly_score??0;
+    const metrics=[
+      {key:'device_cnt',label:'Device',bg:'#e0e7ff',color:'#4f46e5',sid:`${uid}-sp-dev`},
+      {key:'rlf_cnt',label:'RLF',bg:'#ffedd5',color:'#ea580c',sid:`${uid}-sp-rlf`},
+      {key:'ho_failure_cnt',label:'H/O Fail',bg:'#fef9c3',color:'#ca8a04',sid:`${uid}-sp-ho`},
+      {key:'call_cnt',label:'Call',bg:'#dcfce7',color:'#16a34a',sid:`${uid}-sp-call`},
+      {key:'drop_cnt',label:'Drop',bg:'#fee2e2',color:'#dc2626',sid:`${uid}-sp-drop`},
+      {key:'no_rtp_cnt',label:'No-RTP',bg:'#dbeafe',color:'#2563eb',sid:`${uid}-sp-nortp`},
+    ];
+    h+=`<div class="neta-section neta-cards-section">
+      <div class="neta-label">📊 이번 주 현황 (${src.year??''}-W${src.week??''})&nbsp;<span style="font-weight:700;color:${scoreColor(sc)}">이상점수 ${sc.toFixed?sc.toFixed(1):sc}</span></div>
+      <div class="neta-info-cards">`;
+    metrics.forEach(m=>{
+      const val=src[m.key]??0;
+      h+=`<div class="neta-info-card" style="background:${m.bg}">
+        <div class="neta-card-label" style="color:${m.color}">${m.label}</div>
+        <div class="neta-card-value" style="color:${m.color}">${val}</div>
+        <canvas id="${m.sid}" class="neta-sparkline"></canvas>
+      </div>`;
+    });
+    h+='</div></div>';
+    if(validTrend)setTimeout(()=>initNetaSparklines(uid,validTrend,metrics),80);
+  }
+
+  // ── Section 3: 주간 트렌드 테이블
   if(validTrend&&validTrend.length){
-    const scoreColor=s=>s>=700?'#c0392b':s>=400?'#b7640a':'#1e8449';
-    html+=`<div class="neta-section" style="flex:3;min-width:340px"><div class="neta-label">📈 주간 트렌드 (최근 ${Math.min(validTrend.length,8)}주)</div>
-    <table class="neta-trend-tbl"><thead><tr>
-      <th>주차</th><th>단말수</th><th>콜</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상점수</th>
-    </tr></thead><tbody>`;
+    const scoreColor=s=>s>=700?'#dc2626':s>=400?'#b45309':'#16a34a';
+    h+=`<div class="neta-section neta-trend-section">
+      <div class="neta-label">📈 주간 트렌드 (최근 ${Math.min(validTrend.length,8)}주)</div>
+      <table class="neta-trend-tbl"><thead><tr>
+        <th>주차</th><th>단말수</th><th>콜</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상점수</th>
+      </tr></thead><tbody>`;
     validTrend.slice(-8).forEach(r=>{
       const sc=r.anomaly_score??0;
-      html+=`<tr>
+      h+=`<tr>
         <td>${r.year}-W${r.week}</td>
-        <td>${esc(r.device_cnt??'-')}</td>
-        <td>${esc(r.call_cnt??'-')}</td>
+        <td>${esc(r.device_cnt??'-')}</td><td>${esc(r.call_cnt??'-')}</td>
         <td style="color:${r.drop_cnt>0?'#c0392b':'inherit'};font-weight:${r.drop_cnt>0?600:400}">${esc(r.drop_cnt??0)}</td>
         <td style="color:${r.no_rtp_cnt>0?'#b7640a':'inherit'}">${esc(r.no_rtp_cnt??0)}</td>
         <td style="color:${r.rlf_cnt>0?'#1a6fa0':'inherit'}">${esc(r.rlf_cnt??0)}</td>
         <td>${esc(r.ho_failure_cnt??0)}</td>
-        <td style="color:${scoreColor(sc)};font-weight:600">${sc.toFixed?sc.toFixed(1):sc}</td>
+        <td style="color:${scoreColor(sc)};font-weight:700">${sc.toFixed?sc.toFixed(1):sc}</td>
       </tr>`;
     });
-    html+='</tbody></table></div>';
+    h+='</tbody></table></div>';
   }else{
     const msg=trendErr?`조회 실패: ${esc(trendErr)}`:'데이터 없음';
-    html+=`<div class="neta-section"><div class="neta-label">📈 주간 트렌드</div><div style="font-size:12px;color:#94a3b8;padding:8px 0">${msg}</div></div>`;
+    h+=`<div class="neta-section"><div class="neta-label">📈 주간 트렌드</div><div style="font-size:12px;color:#94a3b8;padding:8px 0">${msg}</div></div>`;
   }
 
-  html+='</div>';
-  return html;
+  // ── Section 4: 참고 태그
+  if(refTags.length>0){
+    h+=`<div class="neta-section neta-ref-section">
+      <div class="neta-label">🏷 참고</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">`;
+    refTags.forEach(t=>{
+      h+=`<span class="neta-ref-badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}44">${esc(t.text)}</span>`;
+    });
+    h+='</div></div>';
+  }
+
+  h+='</div>';
+  return h;
 }
+
 async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   const next=tr.nextElementSibling;
   if(next&&next.classList.contains('neta-expand-row')){
@@ -1515,20 +1548,18 @@ function renderStationTable(){
   const qPci=(document.getElementById('stPci').value||'').toLowerCase();
   const qBand=(document.getElementById('stBand').value||'').toLowerCase();
   const lv=document.getElementById('stFilter').value;
-  const anlLvs=['CRITICAL','HIGH','MEDIUM','LOW'];
-  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.nonMicMutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp,sinr:s=>s.avgSinr,bler:s=>s.avgBler,anomaly:s=>s.anomalyIndex};
-  const anlLvO={CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3};
+  const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.nonMicMutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp,sinr:s=>s.avgSinr,bler:s=>s.avgBler};
+  const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
-    if(anlLvs.includes(lv))return s.anomalyLevel===lv;
-    if(lv&&s.level!==lv)return false;
+    if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
     if(qTac&&!String(s.tac).toLowerCase().includes(qTac))return false;
     if(qPci&&!String(s.pid).toLowerCase().includes(qPci))return false;
     if(qBand&&!String(s.band||s.dch).toLowerCase().includes(qBand))return false;
     return true;
   });
   if(stSortCol==='default'||!colFn[stSortCol]){
-    all.sort((a,b)=>(b.anomalyIndex-a.anomalyIndex)||((anlLvO[a.anomalyLevel]??9)-(anlLvO[b.anomalyLevel]??9)));
+    all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
   } else {
     const fn=colFn[stSortCol];
     all.sort((a,b)=>{
@@ -1539,24 +1570,22 @@ function renderStationTable(){
     });
   }
   stationTableRows=all;
-  const anlCls={CRITICAL:'anl-critical',HIGH:'anl-high',MEDIUM:'anl-medium',LOW:'anl-low'};
-  const anlColor={CRITICAL:'#dc2626',HIGH:'#ea580c',MEDIUM:'#ca8a04',LOW:'#16a34a'};
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
+  const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb',normal:'tgr'};
   const thW=(col,label,w,bg)=>`<th class="th-sort${stSortCol===col?' '+stSortDir:''}" onclick="stSort('${col}')" style="width:${w}px;min-width:${w}px${bg?';background:'+bg:''}">${label}</th>`;
-  const G1='#1a4080',G2='#1a5c3a',G3='#3b1f6e',GA='#4a1942';
-  const G1s='#225099',G2s='#226645',G3s='#4a2880',GAs='#5e2256';
+  const G1='#1a4080',G2='#1a5c3a',G3='#3b1f6e';
+  const G1s='#225099',G2s='#226645',G3s='#4a2880';
   const grpTh=(label,span,bg)=>`<th colspan="${span}" style="background:${bg};font-size:11px;font-weight:700;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,0.18);letter-spacing:.04em">${label}</th>`;
   document.getElementById('stHead').innerHTML=
     '<tr>'
     +'<th rowspan="2" style="width:32px;min-width:32px;background:var(--blue-800)">#</th>'
-    +grpTh('이상지수',1,GA)
-    +'<th rowspan="2" style="width:70px;min-width:70px;background:var(--blue-800)">상태</th>'
+    +'<th rowspan="2" style="width:62px;min-width:62px;background:var(--blue-800)">상태</th>'
     +grpTh('기지국 정보',6,G1)
     +grpTh('발생 이벤트',4,G2)
     +grpTh('전계 정보(평균)',3,G3)
+    +'<th rowspan="2" style="width:120px;min-width:100px;background:#4a1942;font-size:11px">참고</th>'
     +'</tr>'
     +'<tr>'
-    +thW('anomaly','점수(1000)',82,GAs)
     +`<th style="width:86px;min-width:86px;background:${G1s}">PLMN</th>`
     +`<th style="width:56px;min-width:56px;background:${G1s}">ACT</th>`
     +`<th style="width:72px;min-width:72px;background:${G1s}">TAC(HEX)</th>`
@@ -1581,20 +1610,19 @@ function renderStationTable(){
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
-    const aColor=anlColor[s.anomalyLevel]||'#64748b';
-    const barW=Math.round(s.anomalyIndex/10);
-    const levTip=lbl[s.level]||'';
+    // NETA 참고 태그 (캐시된 경우만)
+    const ck=netaResolve(plmnRaw,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
+    const refTags=netaRefTagCache[ck]||[];
+    const refCell=refTags.length>0
+      ?refTags.map(t=>`<span class="neta-ref-badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}44">${t.text}</span>`).join('')
+      :(netaCache[ck]?.data?'<span style="color:#94a3b8;font-size:11px">-</span>':'');
     const isTop3=i<3;
     const netaOnclick=isTop3?`toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}');selectStationRow(${i})`:`selectStationRow(${i})`;
     const netaCls=isTop3?' class="neta-clickable"':'';
     const netaKey=isTop3?` data-neta-key="${s.key}"`:'';
     return`<tr id="st-row-${i}"${netaCls}${netaKey} onclick="${netaOnclick}" style="cursor:pointer">
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
-      <td style="white-space:nowrap">
-        <span style="font-weight:700;color:${aColor};font-size:13px">${s.anomalyIndex}</span>
-        <span class="anomaly-bar-wrap"><span class="anomaly-bar" style="width:${barW}%;background:${aColor}"></span></span>
-      </td>
-      <td><span class="badge ${anlCls[s.anomalyLevel]}" ${levTip?`data-tip="${levTip}"`:''}>${s.anomalyLevel}</span></td>
+      <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
       <td>${plmnDisp}</td><td>${actDisp}</td>
       <td>${s.tac}</td><td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
@@ -1604,11 +1632,11 @@ function renderStationTable(){
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
       <td style="color:${s.avgBler!==null&&s.avgBler>=40?'#b7640a':'inherit'};font-weight:${s.avgBler!==null&&s.avgBler>=40?700:400}">${s.avgBler!==null?s.avgBler:'-'}</td>
+      <td style="font-size:11px;text-align:left;padding:4px 6px;line-height:1.6">${refCell}</td>
     </tr>`;
   }).join(''):'<tr><td colspan="16" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
-  updateStationMapMarkers(all);
-  // 상위 3개 기지국 자동 확장 (캐시 있으면 즉시, 없으면 로딩 상태)
+  // 상위 3개 기지국 자동 확장
   all.slice(0,3).forEach(s=>{
     const tr=document.querySelector(`[data-neta-key="${CSS.escape(s.key)}"]`);
     if(!tr)return;
@@ -1998,18 +2026,16 @@ function exportStationTable(mode){
   const lv=document.getElementById('stFilter').value;
   const lvO={issue:0,weak_sig:1,inter:2,high_bler:3,normal:4};
   const colFn={cend:s=>s.cends.length,drop:s=>s.drops.length,mute:s=>s.nonMicMutes.length,rlfi:s=>s.rlfis.length,prob:s=>s.problemRate,rsrp:s=>s.avgRsrp,sinr:s=>s.avgSinr,bler:s=>s.avgBler};
-  const anlLvs3=['CRITICAL','HIGH','MEDIUM','LOW'];
   let all=Object.values(stationMap).filter(s=>{
     if(lv==='antdiff')return s.hasAntDiff;
-    if(anlLvs3.includes(lv))return s.anomalyLevel===lv;
-    if(lv&&s.level!==lv)return false;
+    if(lv&&lv!=='antdiff'&&s.level!==lv)return false;
     if(qTac&&!String(s.tac).toLowerCase().includes(qTac))return false;
     if(qPci&&!String(s.pid).toLowerCase().includes(qPci))return false;
     if(qBand&&!String(s.band||s.dch).toLowerCase().includes(qBand))return false;
     return true;
   });
   if(stSortCol==='default'||!colFn[stSortCol]){
-    all.sort((a,b)=>(b.anomalyIndex-a.anomalyIndex)||((lvO[a.level]??9)-(lvO[b.level]??9)));
+    all.sort((a,b)=>(b.score-a.score)||((lvO[a.level]??9)-(lvO[b.level]??9)));
   } else {
     const fn=colFn[stSortCol];
     all.sort((a,b)=>{
@@ -2022,7 +2048,7 @@ function exportStationTable(mode){
   if(!all.length){alert('기지국 데이터가 없습니다.');return;}
   const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
-  const hdrs=['순위','이상지수','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
+  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER','참고'];
   const rows=all.map((s,i)=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
@@ -2030,7 +2056,11 @@ function exportStationTable(mode){
     const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
     const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
-    return[String(i+1),String(s.anomalyIndex??0),s.anomalyLevel||lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-'];
+    const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const plmnR=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    const ck2=netaResolve(plmnR,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
+    const refStr=(netaRefTagCache[ck2]||[]).map(t=>t.text).join(' / ')||'-';
+    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-',refStr];
   });
   if(mode==='csv'){
     const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
@@ -2083,7 +2113,7 @@ function showTab(name){
   ['overview','station','mute','drop','daily','trend','raw'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===name?'block':'none';});
   document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['overview','station','mute','drop','daily','trend','raw'][i]===name);});
   if(name==='trend')renderTrend();
-  if(name==='station'){renderStationTable();setTimeout(initStationLeafletMap,50);}
+  if(name==='station')renderStationTable();
   if(name==='drop')renderDropTab();
 }
 (function(){
@@ -2239,6 +2269,52 @@ function selectStationRow(idx){
       ${s.avgRsrp!==null?`RSRP: ${s.avgRsrp} dBm`:''}${s.avgSinr!==null?`&nbsp;SINR: ${s.avgSinr} dB`:''}${s.avgBler!==null?`&nbsp;BLER: ${s.avgBler}%`:''}
       ${!geo2?'<br><span style="color:#94a3b8;font-size:11px"><i class="fa fa-map-marker-alt"></i> 위치 CSV 업로드 시 지도에 표시</span>':''}
     </div>`;
+}
+
+// ─── NETA 참고 태그 캐시 + 소형 지도/스파크라인 ──────────────────
+let netaRefTagCache={};
+let stationTableRows=[];
+
+function initNetaMiniMap(mapId,lat,lng){
+  const el=document.getElementById(mapId);
+  if(!el||el._leafletMap)return;
+  const m=L.map(mapId,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false}).setView([lat,lng],15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+  const icon=L.divIcon({html:'<div style="background:#e74c3c;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12],iconAnchor:[6,6]});
+  L.marker([lat,lng],{icon}).addTo(m);
+  el._leafletMap=m;
+  setTimeout(()=>m.invalidateSize(),100);
+}
+
+function initNetaSparklines(uid,trend,metrics){
+  const rows=trend.slice(-8);
+  metrics.forEach(m=>{
+    const canvas=document.getElementById(m.sid);
+    if(!canvas||!rows.length)return;
+    if(canvas._chart){canvas._chart.destroy();}
+    const data=rows.map(r=>r[m.key]??0);
+    canvas._chart=new Chart(canvas,{
+      type:'line',
+      data:{
+        labels:data.map((_,i)=>i),
+        datasets:[{data,borderColor:m.color,borderWidth:1.5,fill:true,backgroundColor:m.color+'28',tension:0.4,pointRadius:0}]
+      },
+      options:{
+        animation:false,
+        plugins:{legend:{display:false},tooltip:{enabled:false}},
+        scales:{x:{display:false},y:{display:false,min:0}},
+        maintainAspectRatio:false
+      }
+    });
+  });
+}
+
+function selectStationRow(idx){
+  const s=stationTableRows[idx];
+  if(!s)return;
+  document.querySelectorAll('#stBody tr').forEach(tr=>tr.classList.remove('st-row-selected'));
+  const row=document.getElementById('st-row-'+idx);
+  if(row){row.classList.add('st-row-selected');row.scrollIntoView({block:'nearest'});}
 }
 
 </script>
