@@ -1302,14 +1302,26 @@ async function fetchNetaStation(plmn,tac,pci,band){
   const timer=setTimeout(()=>ctrl.abort(),4000);
   try{
     const p=new URLSearchParams({plmn,tac,pci,band});
-    const res=await fetch(`${NETA_BASE}${NETA_ENDPOINT}?${p}`,{signal:ctrl.signal});
+    const url=`${NETA_BASE}${NETA_ENDPOINT}?${p}`;
+    const res=await fetch(url,{signal:ctrl.signal});
     clearTimeout(timer);
-    if(!res.ok)return null;
+    if(!res.ok)return{_err:`HTTP ${res.status} ${res.statusText}`,_url:url};
     return await res.json();
-  }catch{clearTimeout(timer);return null;}
+  }catch(e){
+    clearTimeout(timer);
+    const p=new URLSearchParams({plmn,tac,pci,band});
+    const url=`${NETA_BASE}${NETA_ENDPOINT}?${p}`;
+    const reason=e.name==='AbortError'?'타임아웃(4s 초과)':e.message||String(e);
+    console.error('[NETA] fetch 실패:',reason,'URL:',url,e);
+    return{_err:reason,_url:url};
+  }
 }
 function buildNetaPanel(data,plmn,tac,pci,band){
-  if(!data)return`<div class="neta-offline">⚠ NETA 서버(${NETA_BASE})에 접속할 수 없습니다 — 사내 네트워크 연결을 확인하세요</div>`;
+  if(!data||data._err){
+    const reason=data?._err||'알 수 없는 오류';
+    const url=data?._url||`${NETA_BASE}${NETA_ENDPOINT}`;
+    return`<div class="neta-offline">⚠ NETA 조회 실패: <b>${reason}</b><br><span style="font-size:11px;opacity:.8">요청 URL: ${url}<br>브라우저 개발자도구(F12) → Console/Network 탭에서 상세 오류를 확인하세요</span></div>`;
+  }
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   let html='<div class="neta-panel">';
   const addr=data.address??data.addr??data.location??data.address_full??'';
