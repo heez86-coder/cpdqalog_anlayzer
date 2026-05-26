@@ -1321,24 +1321,43 @@ function buildNetaPanel(data,plmn,tac,pci,dlch){
     const url=data?._url||NETA_BASE;
     return`<div class="neta-offline">⚠ NETA 조회 실패: <b>${reason}</b><br><span style="font-size:11px;opacity:.8">요청 URL: ${url}<br>브라우저 개발자도구(F12) → Console/Network 탭에서 상세 오류를 확인하세요</span></div>`;
   }
+  if(!Array.isArray(data)||!data.length)return`<div class="neta-offline">⚠ NETA 데이터 없음 (TAC ${tac} / PCI ${pci})</div>`;
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const latest=data[data.length-1];
   let html='<div class="neta-panel">';
-  const addr=data.address??data.addr??data.location??data.address_full??'';
-  html+=`<div class="neta-section"><div class="neta-label">📍 상세 주소</div><div class="neta-value">${esc(addr)||'-'}</div></div>`;
-  const lat=data.lat??data.latitude??data.y??null;
-  const lng=data.lng??data.longitude??data.x??null;
-  if(lat!=null&&lng!=null){
-    const kakaoUrl=`https://map.kakao.com/link/map/${encodeURIComponent('TAC'+tac+'/PCI'+pci)},${lat},${lng}`;
-    html+=`<div class="neta-section"><div class="neta-label">🗺 지도</div><div class="neta-value"><a href="${kakaoUrl}" target="_blank" style="color:#2980b9;font-weight:600;text-decoration:none">카카오맵에서 보기 ↗</a><br><span style="font-size:11px;color:#64748b">위도 ${lat} / 경도 ${lng}</span></div></div>`;
+
+  // 기지국 정보 (주소/벤더)
+  const region=latest.region||'-';
+  const vendor=latest.vendor?` <span style="font-size:11px;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:10px">${esc(latest.vendor)}</span>`:'';
+  html+=`<div class="neta-section"><div class="neta-label">📍 주소</div><div class="neta-value">${esc(region)}${vendor}</div></div>`;
+
+  // 지도
+  if(latest.lat!=null&&latest.lng!=null){
+    const kakaoUrl=`https://map.kakao.com/link/map/${encodeURIComponent('TAC'+tac+'/PCI'+pci)},${latest.lat},${latest.lng}`;
+    html+=`<div class="neta-section" style="min-width:140px;max-width:180px"><div class="neta-label">🗺 지도</div><div class="neta-value"><a href="${kakaoUrl}" target="_blank" style="color:#2980b9;font-weight:600;text-decoration:none">카카오맵 ↗</a><br><span style="font-size:11px;color:#64748b">${latest.lat}, ${latest.lng}</span></div></div>`;
   }
-  const trend=data.weekly_trend??data.trend??data.weeklyTrend??[];
-  if(trend.length){
-    html+='<div class="neta-section" style="flex:2;min-width:260px"><div class="neta-label">📈 주간 트렌드</div><table class="neta-trend-tbl"><thead><tr><th>날짜</th><th>DROP</th><th>MUTE</th><th>RLF</th></tr></thead><tbody>';
-    trend.slice(-7).forEach(r=>{
-      html+=`<tr><td>${esc(r.date??r.Date??'')}</td><td>${esc(r.drop??r.DROP??0)}</td><td>${esc(r.mute??r.MUTE??0)}</td><td>${esc(r.rlf??r.RLF??0)}</td></tr>`;
-    });
-    html+='</tbody></table></div>';
-  }
+
+  // 주간 트렌드 테이블
+  const scoreColor=s=>s>=700?'#c0392b':s>=400?'#b7640a':'#1e8449';
+  html+=`<div class="neta-section" style="flex:3;min-width:320px"><div class="neta-label">📈 주간 트렌드 (최근 ${Math.min(data.length,8)}주)</div>
+  <table class="neta-trend-tbl"><thead><tr>
+    <th>주차</th><th>단말수</th><th>콜</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상점수</th>
+  </tr></thead><tbody>`;
+  data.slice(-8).forEach(r=>{
+    const sc=r.anomaly_score??0;
+    html+=`<tr>
+      <td>${r.year}-W${r.week}</td>
+      <td>${esc(r.device_cnt??'-')}</td>
+      <td>${esc(r.call_cnt??'-')}</td>
+      <td style="color:${r.drop_cnt>0?'#c0392b':'inherit'};font-weight:${r.drop_cnt>0?600:400}">${esc(r.drop_cnt??0)}</td>
+      <td style="color:${r.no_rtp_cnt>0?'#b7640a':'inherit'}">${esc(r.no_rtp_cnt??0)}</td>
+      <td style="color:${r.rlf_cnt>0?'#1a6fa0':'inherit'}">${esc(r.rlf_cnt??0)}</td>
+      <td>${esc(r.ho_failure_cnt??0)}</td>
+      <td style="color:${scoreColor(sc)};font-weight:600">${sc.toFixed?sc.toFixed(1):sc}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+
   html+='</div>';
   return html;
 }
