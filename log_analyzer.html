@@ -330,6 +330,11 @@ const PDPI_ENDR={'207':'SERVICES NOT ALLOWED','261':'SERVICE REQ FAILED','263':'
 const PDPF_ENDR={'26':'INSUFF RSC','31':'UNSPEC REJ','33':'SERV UNSUB','36':'REGULAR DEACTIVATION','38':'NWK FAIL','39':'REACTIVATION REQUIRED','51':'PDP TYPE IPV6 ONLY ALLOWED','300':'LTE NAS LRRC CONNECTION REL ABORTED IRAT SUCCESS','301':'LTE NAS REJ LRRC RADIO LINK FAILURE','302':'LTE NAS SERVICE REQ FAILURE LTE NW REJECT','303':'LTE NAS DETACH WITH REATTACH LTE NW DETACH','304':'LTE NAS DETACH WITHOUT REATTACH LTE NW DETACH','305':'LTE NAS LRRC CONN EST FAILURE RF UNAVAILABLE','306':'LTE NAS REJ NO SERVICE TRM UNAVAILABLE','307':'LTE NAS LRRC CONN EST FAILURE TAI CHANGED','309':'ESM NO ACTIVE BEARER','310':'LTE NAS EMM FAILURE NO RETRY','311':'LTE NAS EMM FAILURE SIM BUSY','312':'LTE NAS LRRC CONN EST FAILURE ACCESS BARRED EAB'};
 // ── NETA 연동 설정 ──────────────────────────────────────
 const NETA_BASE='http://10.246.56.50:8000';
+const BAND_DLCH_MAP={
+  'SKT': {'1':275,'3':1350,'5':2500,'7':2850},
+  'KT':  {'1':475,'3':1550,'8':3743},
+  'LGU+':{'1':100,'5':2600,'7':3050}
+};
 const SAMPLE=`2026-04-05 08:10:01 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 09:22:14 CEND\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","Ctype":"4"}
 2026-04-05 10:05:33 DROP\t{"JVER":"SYH1","TAC_":"338","PhID":"101","DLCh":"1850","RxP0":"-105","RxP1":"-108","SNR0":"-2","SNR1":"-3"}
@@ -1296,9 +1301,11 @@ function renderDropTab(){
   });
   document.getElementById('dropContent').innerHTML=html;
 }
-async function fetchNetaStation(plmn,tac,pci,dlch){
+async function fetchNetaStation(plmn,tac,pci,band,dch){
   const tacDec=parseInt(tac,16)||tac;
   const operator=PLMN_OP[plmn]||plmn;
+  // 밴드번호 → 대표 dlch 변환, 없으면 raw dch 사용
+  const dlch=BAND_DLCH_MAP[operator]?.[band]??dch??band;
   const q=new URLSearchParams({operator,tac:tacDec,pci,dlch});
   const urlInfo=`${NETA_BASE}/api/stations?${q}`;
   const urlTrend=`${NETA_BASE}/api/stations/${tacDec}/trend?${new URLSearchParams({operator,pci,dlch})}`;
@@ -1402,7 +1409,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   html+='</div>';
   return html;
 }
-async function toggleNetaRow(tr,plmn,tac,pci,dlch){
+async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   const next=tr.nextElementSibling;
   if(next&&next.classList.contains('neta-expand-row')){
     next.remove();tr.classList.remove('expanded');return;
@@ -1412,8 +1419,8 @@ async function toggleNetaRow(tr,plmn,tac,pci,dlch){
   expRow.className='neta-expand-row';
   expRow.innerHTML='<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중…</div></td>';
   tr.after(expRow);
-  const data=await fetchNetaStation(plmn,tac,pci,dlch);
-  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,dlch)}</td>`;
+  const data=await fetchNetaStation(plmn,tac,pci,band,dch);
+  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
 }
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
@@ -1483,7 +1490,7 @@ function renderStationTable(){
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
     const isTop3=i<3;
-    const netaAttr=isTop3?` class="neta-clickable" title="클릭하면 NETA 기지국 상세정보를 조회합니다" onclick="toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||s.dch}')"`:' ';
+    const netaAttr=isTop3?` class="neta-clickable" title="클릭하면 NETA 기지국 상세정보를 조회합니다" onclick="toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}')"`:' ';
     return`<tr${netaAttr}>
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
