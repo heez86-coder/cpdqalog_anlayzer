@@ -1311,7 +1311,7 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
   const urlTrend=`${NETA_BASE}/api/stations/${tacDec}/trend?${new URLSearchParams({operator,pci,dlch})}`;
   const doFetch=async(url)=>{
     const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),15000);
+    const timer=setTimeout(()=>ctrl.abort(),180000);
     try{
       const res=await fetch(url,{signal:ctrl.signal});
       clearTimeout(timer);
@@ -1417,9 +1417,13 @@ async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   tr.classList.add('expanded');
   const expRow=document.createElement('tr');
   expRow.className='neta-expand-row';
-  expRow.innerHTML='<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중…</div></td>';
+  const loadId='neta-load-'+Date.now();
+  expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초 (서버 응답이 느릴 수 있습니다)</div></td>`;
   tr.after(expRow);
+  let sec=0;
+  const ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;},1000);
   const data=await fetchNetaStation(plmn,tac,pci,band,dch);
+  clearInterval(ticker);
   expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
 }
 function renderStationTable(){
