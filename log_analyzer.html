@@ -1311,7 +1311,7 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
   const urlTrend=`${NETA_BASE}/api/stations/${tacDec}/trend?${new URLSearchParams({operator,pci,dlch})}`;
   const doFetch=async(url)=>{
     const ctrl=new AbortController();
-    const timer=setTimeout(()=>ctrl.abort(),4000);
+    const timer=setTimeout(()=>ctrl.abort(),15000);
     try{
       const res=await fetch(url,{signal:ctrl.signal});
       clearTimeout(timer);
