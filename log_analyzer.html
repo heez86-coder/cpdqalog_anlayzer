@@ -188,7 +188,7 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 .neta-expand-row td{padding:0!important;background:#f0f7ff!important}
 .neta-panel{padding:14px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%)}
 .neta-section{flex:1;min-width:180px}
-.neta-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.neta-label{font-size:12px;font-weight:700;color:#1f4589;letter-spacing:.02em;margin-bottom:5px}
 .neta-value{font-size:13px;color:#1e293b;line-height:1.6}
 .neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%}
 .neta-trend-tbl th{background:#dbeafe;color:#1a4080;padding:3px 8px;text-align:center;font-weight:600}
@@ -210,15 +210,21 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 .neta-ref-section{padding-top:6px;border-top:1px solid #dbeafe}
 .neta-vendor-badge{font-size:11px;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:10px;margin-left:4px}
 .neta-leaflet-mini{height:140px;border-radius:8px;border:1px solid var(--border);margin-top:6px;overflow:hidden;box-shadow:var(--shadow-sm)}
-.neta-info-cards{display:flex;gap:5px;flex-wrap:nowrap;margin-top:5px;align-items:flex-start}
-.neta-info-card{flex:1;min-width:0;padding:6px 6px 5px;border-radius:8px;text-align:center;align-self:flex-start}
+.neta-info-cards{display:flex;gap:5px;flex-wrap:nowrap;margin-top:6px;align-items:flex-start}
+.neta-info-card{flex:1;min-width:0;padding:7px 6px 6px;border-radius:8px;text-align:center;align-self:flex-start}
 .neta-card-label{font-size:10px;font-weight:700;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .neta-card-value{font-size:15px;font-weight:800;line-height:1.2;margin:2px 0}
 .neta-sparkline{display:block;margin-top:2px;overflow:visible}
-.neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%;margin-top:6px}
-.neta-trend-tbl th{background:var(--blue-800);color:#fff;padding:4px 8px;text-align:center;font-size:11px;font-weight:700}
-.neta-trend-tbl td{padding:4px 8px;text-align:center;border-bottom:1px solid #e2e8f0}
-.neta-trend-tbl tr:hover td{background:#f0f5fb}
+/* 트렌드 테이블 NETA 스타일 */
+.neta-trend-wrap{background:#fff;border-radius:10px;border:1px solid #dde4ee;box-shadow:0 2px 8px rgba(42,80,160,.06);overflow:hidden;margin-top:6px}
+.neta-trend-tbl{border-collapse:collapse;font-size:12px;width:100%}
+.neta-trend-tbl thead tr th{background:#1f4589;color:#fff;padding:9px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid rgba(255,255,255,.1);letter-spacing:.02em}
+.neta-trend-tbl thead tr th:first-child{border-radius:9px 0 0 0}
+.neta-trend-tbl thead tr th:last-child{border-radius:0 9px 0 0;border-right:none}
+.neta-trend-tbl tbody td{padding:8px 8px;border-bottom:1px solid #eef2ff;border-right:1px solid #f5f7ff;font-size:12px;text-align:center;color:#1e293b}
+.neta-trend-tbl tbody td:last-child{border-right:none}
+.neta-trend-tbl tbody tr:last-child td{border-bottom:none}
+.neta-trend-tbl tbody tr:hover td{background:#f0f5fb}
 /* 참고 배지 */
 .neta-ref-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin:2px 3px 2px 0}
 /* 타임라인 */
@@ -1496,17 +1502,17 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   if(validTrend&&validTrend.length){
     rightCol+=`<div class="neta-trend-section">
       <div class="neta-label">📈 주간 트렌드 (최근 ${Math.min(validTrend.length,8)}주)</div>
-      <div class="neta-trend-scroll"><table class="neta-trend-tbl"><thead><tr>
+      <div class="neta-trend-wrap"><table class="neta-trend-tbl"><thead><tr>
         <th>주차</th><th>단말</th><th>콜</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상점수</th>
       </tr></thead><tbody>`;
     validTrend.slice(-8).forEach(r=>{
       const sc=r.anomaly_score??0;
       rightCol+=`<tr>
-        <td>${r.year}-W${r.week}</td>
+        <td style="font-weight:600;color:#1f4589">${r.year}-W${r.week}</td>
         <td>${esc(r.device_cnt??'-')}</td><td>${esc(r.call_cnt??'-')}</td>
-        <td style="color:${r.drop_cnt>0?'#c0392b':'inherit'};font-weight:${r.drop_cnt>0?600:400}">${esc(r.drop_cnt??0)}</td>
-        <td style="color:${r.no_rtp_cnt>0?'#b7640a':'inherit'}">${esc(r.no_rtp_cnt??0)}</td>
-        <td style="color:${r.rlf_cnt>0?'#1a6fa0':'inherit'}">${esc(r.rlf_cnt??0)}</td>
+        <td style="color:${r.drop_cnt>0?'#c0392b':'inherit'};font-weight:${r.drop_cnt>0?700:400}">${esc(r.drop_cnt??0)}</td>
+        <td style="color:${r.no_rtp_cnt>0?'#b45309':'inherit'};font-weight:${r.no_rtp_cnt>0?700:400}">${esc(r.no_rtp_cnt??0)}</td>
+        <td style="color:${r.rlf_cnt>0?'#1a6fa0':'inherit'};font-weight:${r.rlf_cnt>0?700:400}">${esc(r.rlf_cnt??0)}</td>
         <td>${esc(r.ho_failure_cnt??0)}</td>
         <td style="color:${scoreColor(sc)};font-weight:700">${sc.toFixed?sc.toFixed(1):sc}</td>
       </tr>`;
@@ -2252,7 +2258,7 @@ let netaRefTagCache={};
 function initNetaMiniMap(mapId,lat,lng){
   const el=document.getElementById(mapId);
   if(!el||el._leafletMap)return;
-  const m=L.map(mapId,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false}).setView([lat,lng],15);
+  const m=L.map(mapId,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false}).setView([lat,lng],13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
   const icon=L.divIcon({html:'<div style="background:#e74c3c;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12],iconAnchor:[6,6]});
   L.marker([lat,lng],{icon}).addTo(m);
