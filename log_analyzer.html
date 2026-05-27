@@ -2244,36 +2244,10 @@ function selectStationRow(idx){
   document.querySelectorAll('#stBody tr').forEach(tr=>tr.classList.remove('st-row-selected'));
   const row=document.getElementById('st-row-'+idx);
   if(row){row.classList.add('st-row-selected');row.scrollIntoView({block:'nearest'});}
-  const geo=getStationGeo(s.tac,s.pid);
-  if(geo&&stationLeafletMap){
-    stationLeafletMap.flyTo([geo.lat,geo.lng],13,{duration:0.8});
-    const marker=stationMarkerObjects[idx];
-    if(marker)setTimeout(()=>marker.openPopup(),900);
-  }
-  const color=getAnomLevelColor(s.anomalyLevel);
-  const anlCls2={CRITICAL:'anl-critical',HIGH:'anl-high',MEDIUM:'anl-medium',LOW:'anl-low'};
-  const tacDec=s.tac?parseInt(s.tac,16):NaN;
-  const detail=document.getElementById('stMapDetail');
-  if(!detail)return;
-  detail.style.display='block';
-  const geo2=getStationGeo(s.tac,s.pid);
-  detail.innerHTML=`
-    <div style="font-weight:700;color:${color};margin-bottom:6px;font-size:13px">
-      <span class="badge ${anlCls2[s.anomalyLevel]}">${s.anomalyLevel}</span>&nbsp;이상지수 ${s.anomalyIndex}점
-    </div>
-    <div style="color:var(--text-secondary);line-height:1.9;font-size:12px">
-      TAC: <b>${s.tac}</b>${!isNaN(tacDec)?` (DEC: ${tacDec})`:''} | PCI: <b>${s.pid}</b> | Band: ${s.band||s.dch}<br>
-      DROP: <span style="color:#c0392b;font-weight:600">${s.drops.length}건</span>&nbsp;&nbsp;
-      RLF: <span style="color:#1a6fa0;font-weight:600">${s.rlfis.length}건</span>&nbsp;&nbsp;
-      MUTE: <span style="color:#b7640a;font-weight:600">${s.nonMicMutes.length}건</span><br>
-      ${s.avgRsrp!==null?`RSRP: ${s.avgRsrp} dBm`:''}${s.avgSinr!==null?`&nbsp;SINR: ${s.avgSinr} dB`:''}${s.avgBler!==null?`&nbsp;BLER: ${s.avgBler}%`:''}
-      ${!geo2?'<br><span style="color:#94a3b8;font-size:11px"><i class="fa fa-map-marker-alt"></i> 위치 CSV 업로드 시 지도에 표시</span>':''}
-    </div>`;
 }
 
 // ─── NETA 참고 태그 캐시 + 소형 지도/스파크라인 ──────────────────
 let netaRefTagCache={};
-let stationTableRows=[];
 
 function initNetaMiniMap(mapId,lat,lng){
   const el=document.getElementById(mapId);
@@ -2309,13 +2283,6 @@ function initNetaSparklines(uid,trend,metrics){
   });
 }
 
-function selectStationRow(idx){
-  const s=stationTableRows[idx];
-  if(!s)return;
-  document.querySelectorAll('#stBody tr').forEach(tr=>tr.classList.remove('st-row-selected'));
-  const row=document.getElementById('st-row-'+idx);
-  if(row){row.classList.add('st-row-selected');row.scrollIntoView({block:'nearest'});}
-}
 
 </script>
 </body>
