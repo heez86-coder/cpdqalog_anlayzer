@@ -225,6 +225,8 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 .neta-trend-tbl tbody td:last-child{border-right:none}
 .neta-trend-tbl tbody tr:last-child td{border-bottom:none}
 .neta-trend-tbl tbody tr:hover td{background:#f0f5fb;cursor:pointer}
+/* 기지국 인라인 컬럼 헤더 (NETA 확장 시 데이터행 위) */
+.st-col-header-row th{background:#dbeafe;color:#1a4080;font-size:10px;font-weight:700;padding:4px 4px;text-align:center;border-top:2px solid #2980b9;border-bottom:1px solid #bfdbfe;white-space:nowrap}
 /* 참고 배지 */
 .neta-ref-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin:2px 3px 2px 0}
 /* 타임라인 */
@@ -1526,13 +1528,27 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   return`<div class="neta-panel">${leftCol}${rightCol}</div>`;
 }
 
+const ST_COL_HDRS=['#','상태','PLMN','ACT','TAC\n(HEX)','TAC\n(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER','참고'];
+function insertStColHeader(tr){
+  const prev=tr.previousElementSibling;
+  if(prev&&prev.classList.contains('st-col-header-row'))return;
+  const hdr=document.createElement('tr');
+  hdr.className='st-col-header-row';
+  hdr.innerHTML=ST_COL_HDRS.map(h=>`<th style="white-space:pre-line">${h}</th>`).join('');
+  tr.before(hdr);
+}
+function removeStColHeader(tr){
+  const prev=tr.previousElementSibling;
+  if(prev&&prev.classList.contains('st-col-header-row'))prev.remove();
+}
 async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   const next=tr.nextElementSibling;
   if(next&&next.classList.contains('neta-expand-row')){
     if(next._ticker)clearInterval(next._ticker);
-    next.remove();tr.classList.remove('expanded');return;
+    next.remove();removeStColHeader(tr);tr.classList.remove('expanded');return;
   }
   tr.classList.add('expanded');
+  insertStColHeader(tr);
   const expRow=document.createElement('tr');
   expRow.className='neta-expand-row';
   // 캐시 확인 — 있으면 바로 표시
@@ -1648,6 +1664,7 @@ function renderStationTable(){
     const tr=document.querySelector(`[data-neta-key="${CSS.escape(s.key)}"]`);
     if(!tr)return;
     tr.classList.add('expanded');
+    insertStColHeader(tr);
     const expRow=document.createElement('tr');
     expRow.className='neta-expand-row';
     expRow.setAttribute('data-neta-exp',s.key);
