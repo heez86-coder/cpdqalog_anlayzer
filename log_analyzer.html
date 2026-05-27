@@ -2056,9 +2056,7 @@ function exportStationTable(mode){
     const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
     const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
-    const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
-    const plmnR=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
-    const ck2=netaResolve(plmnR,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
+    const ck2=netaResolve(plmnRaw,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
     const refStr=(netaRefTagCache[ck2]||[]).map(t=>t.text).join(' / ')||'-';
     return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-',refStr];
   });
