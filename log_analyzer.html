@@ -199,22 +199,22 @@ tr.neta-clickable{cursor:pointer}
 tr.neta-clickable:hover td{filter:brightness(0.96)}
 tr.neta-clickable td:first-child::after{content:' ▾';font-size:10px;color:#94a3b8;display:inline-block}
 tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
-/* ── NETA 패널 개선 (v4) ─────────────────────────────────── */
-.neta-panel{display:grid;grid-template-columns:220px 1fr;gap:12px;padding:12px 16px;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%);max-height:340px;overflow:hidden;box-sizing:border-box}
-.neta-left-col{display:flex;flex-direction:column;gap:6px;overflow:hidden}
-.neta-right-col{display:flex;flex-direction:column;gap:8px;overflow:hidden;min-width:0}
-.neta-loc-section{flex-shrink:0}
-.neta-cards-section{flex-shrink:0}
-.neta-trend-section{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
-.neta-trend-scroll{overflow-y:auto;flex:1;min-height:0}
-.neta-ref-section{padding-top:6px;border-top:1px solid #dbeafe;flex-shrink:0}
+/* ── NETA 패널 개선 (v5) ─────────────────────────────────── */
+.neta-panel{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:12px 16px;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%);box-sizing:border-box;align-items:start}
+.neta-left-col{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.neta-right-col{display:flex;flex-direction:column;gap:8px;min-width:0;max-height:320px;overflow-y:auto}
+.neta-loc-section{}
+.neta-cards-section{}
+.neta-trend-section{}
+.neta-trend-scroll{}
+.neta-ref-section{padding-top:6px;border-top:1px solid #dbeafe}
 .neta-vendor-badge{font-size:11px;color:#64748b;background:#e2e8f0;padding:1px 6px;border-radius:10px;margin-left:4px}
-.neta-leaflet-mini{height:150px;border-radius:8px;border:1px solid var(--border);margin-top:8px;overflow:hidden;box-shadow:var(--shadow-sm)}
-.neta-info-cards{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-.neta-info-card{flex:1;min-width:68px;padding:8px 10px;border-radius:8px;text-align:center}
-.neta-card-label{font-size:10px;font-weight:700;letter-spacing:.04em}
-.neta-card-value{font-size:17px;font-weight:800;line-height:1.2;margin:3px 0}
-.neta-sparkline{width:100%;height:26px;display:block}
+.neta-leaflet-mini{height:140px;border-radius:8px;border:1px solid var(--border);margin-top:6px;overflow:hidden;box-shadow:var(--shadow-sm)}
+.neta-info-cards{display:flex;gap:5px;flex-wrap:nowrap;margin-top:5px;align-items:flex-start}
+.neta-info-card{flex:1;min-width:0;padding:6px 6px 5px;border-radius:8px;text-align:center;align-self:flex-start}
+.neta-card-label{font-size:10px;font-weight:700;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.neta-card-value{font-size:15px;font-weight:800;line-height:1.2;margin:2px 0}
+.neta-sparkline{display:block;margin-top:2px;overflow:visible}
 .neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%;margin-top:6px}
 .neta-trend-tbl th{background:var(--blue-800);color:#fff;padding:4px 8px;text-align:center;font-size:11px;font-weight:700}
 .neta-trend-tbl td{padding:4px 8px;text-align:center;border-bottom:1px solid #e2e8f0}
@@ -1471,26 +1471,27 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   if(src&&(src.device_cnt!=null||src.rlf_cnt!=null)){
     const sc=src.anomaly_score??0;
     const metrics=[
-      {key:'device_cnt',label:'Device',bg:'#e0e7ff',color:'#4f46e5',sid:`${uid}-sp-dev`},
-      {key:'rlf_cnt',label:'RLF',bg:'#ffedd5',color:'#ea580c',sid:`${uid}-sp-rlf`},
-      {key:'ho_failure_cnt',label:'H/O Fail',bg:'#fef9c3',color:'#ca8a04',sid:`${uid}-sp-ho`},
-      {key:'call_cnt',label:'Call',bg:'#dcfce7',color:'#16a34a',sid:`${uid}-sp-call`},
-      {key:'drop_cnt',label:'Drop',bg:'#fee2e2',color:'#dc2626',sid:`${uid}-sp-drop`},
-      {key:'no_rtp_cnt',label:'No-RTP',bg:'#dbeafe',color:'#2563eb',sid:`${uid}-sp-nortp`},
+      {key:'device_cnt',label:'Device',bg:'#e0e7ff',color:'#4f46e5'},
+      {key:'rlf_cnt',label:'RLF',bg:'#ffedd5',color:'#ea580c'},
+      {key:'ho_failure_cnt',label:'H/O Fail',bg:'#fef9c3',color:'#ca8a04'},
+      {key:'call_cnt',label:'Call',bg:'#dcfce7',color:'#16a34a'},
+      {key:'drop_cnt',label:'Drop',bg:'#fee2e2',color:'#dc2626'},
+      {key:'no_rtp_cnt',label:'No-RTP',bg:'#dbeafe',color:'#2563eb'},
     ];
     rightCol+=`<div class="neta-cards-section">
       <div class="neta-label">📊 ${src.year??''}-W${src.week??''}&nbsp;<span style="font-weight:700;color:${scoreColor(sc)}">이상점수 ${sc.toFixed?sc.toFixed(1):sc}</span></div>
       <div class="neta-info-cards">`;
     metrics.forEach(m=>{
       const val=src[m.key]??0;
+      const sparkVals=validTrend?validTrend.slice(-8).map(r=>r[m.key]??0):[];
+      const svg=makeSVGSparkline(sparkVals,m.color);
       rightCol+=`<div class="neta-info-card" style="background:${m.bg}">
         <div class="neta-card-label" style="color:${m.color}">${m.label}</div>
         <div class="neta-card-value" style="color:${m.color}">${val}</div>
-        <canvas id="${m.sid}" class="neta-sparkline"></canvas>
+        ${svg}
       </div>`;
     });
     rightCol+='</div></div>';
-    if(validTrend)setTimeout(()=>initNetaSparklines(uid,validTrend,metrics),80);
   }
   if(validTrend&&validTrend.length){
     rightCol+=`<div class="neta-trend-section">
@@ -2259,27 +2260,21 @@ function initNetaMiniMap(mapId,lat,lng){
   setTimeout(()=>m.invalidateSize(),100);
 }
 
-function initNetaSparklines(uid,trend,metrics){
-  const rows=trend.slice(-8);
-  metrics.forEach(m=>{
-    const canvas=document.getElementById(m.sid);
-    if(!canvas||!rows.length)return;
-    if(canvas._chart){canvas._chart.destroy();}
-    const data=rows.map(r=>r[m.key]??0);
-    canvas._chart=new Chart(canvas,{
-      type:'line',
-      data:{
-        labels:data.map((_,i)=>i),
-        datasets:[{data,borderColor:m.color,borderWidth:1.5,fill:true,backgroundColor:m.color+'28',tension:0.4,pointRadius:0}]
-      },
-      options:{
-        animation:false,
-        plugins:{legend:{display:false},tooltip:{enabled:false}},
-        scales:{x:{display:false},y:{display:false,min:0}},
-        maintainAspectRatio:false
-      }
-    });
-  });
+function makeSVGSparkline(values,color){
+  if(!values||values.length<2)return'';
+  const mn=Math.min(...values,0),mx=Math.max(...values,1);
+  const range=mx-mn||1;
+  const W=100,H=24,pad=1;
+  const pts=values.map((v,i)=>{
+    const x=(i/(values.length-1))*(W-2*pad)+pad;
+    const y=H-pad-((v-mn)/range)*(H-2*pad);
+    return`${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const fillPts=`${pad},${H-pad} ${pts} ${(W-pad).toFixed(1)},${H-pad}`;
+  return`<svg width="100%" height="24" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="neta-sparkline">
+    <polygon points="${fillPts}" fill="${color}28"/>
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
 }
 
 
