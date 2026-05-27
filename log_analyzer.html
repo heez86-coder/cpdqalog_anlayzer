@@ -190,9 +190,6 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 .neta-section{flex:1;min-width:180px}
 .neta-label{font-size:12px;font-weight:700;color:#1f4589;letter-spacing:.02em;margin-bottom:5px;text-align:left}
 .neta-value{font-size:13px;color:#1e293b;line-height:1.6}
-.neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%}
-.neta-trend-tbl th{background:#dbeafe;color:#1a4080;padding:3px 8px;text-align:center;font-weight:600}
-.neta-trend-tbl td{padding:3px 8px;text-align:center;border-bottom:1px solid #e2e8f0}
 .neta-loading{color:#64748b;font-size:12px;padding:12px 20px}
 .neta-offline{color:#b45309;font-size:12px;padding:12px 20px;background:#fffbeb;border-top:2px solid #f59e0b}
 tr.neta-clickable{cursor:pointer}
@@ -202,7 +199,7 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 /* ── NETA 패널 개선 (v5) ─────────────────────────────────── */
 .neta-panel{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:12px 16px;border-top:2px solid #2980b9;background:#fff;box-sizing:border-box;align-items:start}
 .neta-left-col{display:flex;flex-direction:column;gap:6px;align-items:stretch}
-.neta-right-col{display:flex;flex-direction:column;gap:8px;min-width:0;max-height:320px;overflow-y:auto}
+.neta-right-col{display:flex;flex-direction:column;gap:8px;min-width:0}
 .neta-loc-section{}
 .neta-cards-section{}
 .neta-trend-section{}
@@ -1497,7 +1494,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     rightCol+=`<div class="neta-trend-section">
       <div class="neta-label">📈 주간 트렌드 (최근 ${Math.min(validTrend.length,8)}주)</div>
       <div class="neta-trend-wrap"><table class="neta-trend-tbl"><thead><tr>
-        <th>주차</th><th>단말</th><th>콜</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상점수</th>
+        <th>주차</th><th>단말</th><th>Call</th><th>DROP</th><th>No-RTP</th><th>RLF</th><th>HO실패</th><th>이상지수</th>
       </tr></thead><tbody>`;
     validTrend.slice(-8).forEach(r=>{
       const sc=r.anomaly_score??0;
