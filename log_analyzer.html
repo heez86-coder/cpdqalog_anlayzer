@@ -185,8 +185,8 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 .i-good{background:#f0faf3;border-left-color:#1e8449;color:#1a5235}
 .i-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:5px}
 /* NETA 확장 패널 */
-.neta-expand-row td{padding:0!important;background:#f0f7ff!important}
-.neta-panel{padding:14px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%)}
+.neta-expand-row td{padding:0!important;background:#fff!important}
+.neta-panel{padding:14px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-top:2px solid #2980b9;background:#fff}
 .neta-section{flex:1;min-width:180px}
 .neta-label{font-size:12px;font-weight:700;color:#1f4589;letter-spacing:.02em;margin-bottom:5px;text-align:left}
 .neta-value{font-size:13px;color:#1e293b;line-height:1.6}
@@ -200,7 +200,7 @@ tr.neta-clickable:hover td{filter:brightness(0.96)}
 tr.neta-clickable td:first-child::after{content:' ▾';font-size:10px;color:#94a3b8;display:inline-block}
 tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 /* ── NETA 패널 개선 (v5) ─────────────────────────────────── */
-.neta-panel{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:12px 16px;border-top:2px solid #2980b9;background:linear-gradient(135deg,#f0f7ff 0%,#f5f0ff 100%);box-sizing:border-box;align-items:start}
+.neta-panel{display:grid;grid-template-columns:210px 1fr;gap:12px;padding:12px 16px;border-top:2px solid #2980b9;background:#fff;box-sizing:border-box;align-items:start}
 .neta-left-col{display:flex;flex-direction:column;gap:6px;align-items:stretch}
 .neta-right-col{display:flex;flex-direction:column;gap:8px;min-width:0;max-height:320px;overflow-y:auto}
 .neta-loc-section{}
@@ -1461,16 +1461,6 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     </div>`;
     if(lat!=null&&lng!=null){hasMap=true;setTimeout(()=>initNetaMiniMap(`${uid}-map`,lat,lng),80);}
   }
-  // 참고 태그 (왼쪽 하단)
-  if(refTags.length>0){
-    leftCol+=`<div class="neta-ref-section">
-      <div class="neta-label">🏷 참고</div>
-      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">`;
-    refTags.forEach(t=>{
-      leftCol+=`<span class="neta-ref-badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}44">${esc(t.text)}</span>`;
-    });
-    leftCol+='</div></div>';
-  }
   leftCol+='</div>';
 
   // ── 오른쪽 컬럼: 현황 카드 + 트렌드 테이블
@@ -1485,8 +1475,11 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
       {key:'drop_cnt',label:'Drop',bg:'#fee2e2',color:'#dc2626'},
       {key:'no_rtp_cnt',label:'No-RTP',bg:'#dbeafe',color:'#2563eb'},
     ];
+    const refBadges=refTags.map(t=>`<span class="neta-ref-badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}44;font-size:10px;padding:1px 7px">${esc(t.text)}</span>`).join('');
     rightCol+=`<div class="neta-cards-section">
-      <div class="neta-label">📊 기지국 이벤트 데이터 (${src.year??''}-W${src.week??''}기준)</div>
+      <div class="neta-label" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px">
+        <span>📊 기지국 이벤트 데이터 (${src.year??''}-W${src.week??''}기준)</span>${refBadges}
+      </div>
       <div class="neta-info-cards">`;
     metrics.forEach(m=>{
       const val=src[m.key]??0;
@@ -1528,7 +1521,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   return`<div class="neta-panel">${leftCol}${rightCol}</div>`;
 }
 
-const ST_COL_HDRS=['#','상태','PLMN','ACT','TAC\n(HEX)','TAC\n(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER','참고'];
+const ST_COL_HDRS=['#','상태','PLMN','ACT','TAC\n(HEX)','TAC\n(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
 function insertStColHeader(tr){
   const prev=tr.previousElementSibling;
   if(prev&&prev.classList.contains('st-col-header-row'))return;
@@ -1554,17 +1547,17 @@ async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   // 캐시 확인 — 있으면 바로 표시
   const {cacheKey}=netaResolve(plmn,tac,pci,band,dch);
   if(netaCache[cacheKey]?.data){
-    expRow.innerHTML=`<td colspan="16">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci)}</td>`;
+    expRow.innerHTML=`<td colspan="15">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci)}</td>`;
     tr.after(expRow);return;
   }
   const loadId='nl-'+Date.now();
-  expRow.innerHTML=`<td colspan="16"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초</div></td>`;
+  expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초</div></td>`;
   tr.after(expRow);
   let sec=0;
   expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
   const data=await fetchNetaStation(plmn,tac,pci,band,dch);
   clearInterval(expRow._ticker);
-  expRow.innerHTML=`<td colspan="16">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
+  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
 }
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
@@ -1606,7 +1599,6 @@ function renderStationTable(){
     +grpTh('기지국 정보',6,G1)
     +grpTh('발생 이벤트',4,G2)
     +grpTh('전계 정보(평균)',3,G3)
-    +'<th rowspan="2" style="width:120px;min-width:100px;background:#4a1942;font-size:11px">참고</th>'
     +'</tr>'
     +'<tr>'
     +`<th style="width:86px;min-width:86px;background:${G1s}">PLMN</th>`
@@ -1633,12 +1625,6 @@ function renderStationTable(){
     const sinrBad=s.avgSinr!==null&&s.avgSinr<0;
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
-    // NETA 참고 태그 (캐시된 경우만)
-    const ck=netaResolve(plmnRaw,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
-    const refTags=netaRefTagCache[ck]||[];
-    const refCell=refTags.length>0
-      ?refTags.map(t=>`<span class="neta-ref-badge" style="background:${t.color}18;color:${t.color};border:1px solid ${t.color}44">${t.text}</span>`).join('')
-      :(netaCache[ck]?.data?'<span style="color:#94a3b8;font-size:11px">-</span>':'');
     const isTop3=i<3;
     const netaOnclick=isTop3?`toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}');selectStationRow(${i})`:`selectStationRow(${i})`;
     const netaCls=isTop3?' class="neta-clickable"':'';
@@ -1655,9 +1641,8 @@ function renderStationTable(){
       <td style="color:${rsrpBad?'#c0392b':'inherit'};font-weight:${rsrpBad?700:400}">${s.avgRsrp!==null?s.avgRsrp:'-'}</td>
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
       <td style="color:${s.avgBler!==null&&s.avgBler>=40?'#b7640a':'inherit'};font-weight:${s.avgBler!==null&&s.avgBler>=40?700:400}">${s.avgBler!==null?s.avgBler:'-'}</td>
-      <td style="font-size:11px;text-align:left;padding:4px 6px;line-height:1.6">${refCell}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="16" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="15" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
   // 상위 3개 기지국 자동 확장
   all.slice(0,3).forEach(s=>{
@@ -1673,11 +1658,11 @@ function renderStationTable(){
     const {cacheKey}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
     const cached=netaCache[cacheKey]?.data;
     if(cached){
-      expRow.innerHTML=`<td colspan="16">${buildNetaPanel(cached,plmn,s.tac,s.pid)}</td>`;
+      expRow.innerHTML=`<td colspan="15">${buildNetaPanel(cached,plmn,s.tac,s.pid)}</td>`;
     }else{
       let sec=0;
       const loadId='nl-'+Math.random().toString(36).slice(2);
-      expRow.innerHTML=`<td colspan="16"><div class="neta-loading">⏳ NETA 조회 중… <span id="${loadId}">0</span>초</div></td>`;
+      expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 조회 중… <span id="${loadId}">0</span>초</div></td>`;
       expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
     }
     tr.after(expRow);
@@ -2072,7 +2057,7 @@ function exportStationTable(mode){
   if(!all.length){alert('기지국 데이터가 없습니다.');return;}
   const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
-  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER','참고'];
+  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
   const rows=all.map((s,i)=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
@@ -2080,9 +2065,7 @@ function exportStationTable(mode){
     const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
     const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
-    const ck2=netaResolve(plmnRaw,s.tac,s.pid,s.band||'',s.dch||'').cacheKey;
-    const refStr=(netaRefTagCache[ck2]||[]).map(t=>t.text).join(' / ')||'-';
-    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-',refStr];
+    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-'];
   });
   if(mode==='csv'){
     const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
