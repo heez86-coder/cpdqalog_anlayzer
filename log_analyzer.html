@@ -217,14 +217,14 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 .neta-sparkline{display:block;margin-top:2px;overflow:visible}
 /* 트렌드 테이블 NETA 스타일 */
 .neta-trend-wrap{background:#fff;border-radius:10px;border:1px solid #dde4ee;box-shadow:0 2px 8px rgba(42,80,160,.06);overflow:hidden;margin-top:6px}
-.neta-trend-tbl{border-collapse:collapse;font-size:12px;width:100%}
-.neta-trend-tbl thead tr th{background:#1f4589;color:#fff;padding:9px 8px;text-align:center;font-size:12px;font-weight:700;border-right:1px solid rgba(255,255,255,.1);letter-spacing:.02em}
+.neta-trend-tbl{border-collapse:collapse;font-size:11px;width:100%;font-family:inherit}
+.neta-trend-tbl thead tr th{background:#1f4589;color:#fff;padding:11px 6px;text-align:center;font-size:13px;font-weight:700;border-right:1px solid rgba(255,255,255,.08);letter-spacing:.01em}
 .neta-trend-tbl thead tr th:first-child{border-radius:9px 0 0 0}
 .neta-trend-tbl thead tr th:last-child{border-radius:0 9px 0 0;border-right:none}
-.neta-trend-tbl tbody td{padding:8px 8px;border-bottom:1px solid #eef2ff;border-right:1px solid #f5f7ff;font-size:12px;text-align:center;color:#1e293b}
+.neta-trend-tbl tbody td{padding:8px 6px;border-bottom:1px solid #eef2ff;border-right:1px solid #f5f7ff;font-size:11px;text-align:center;color:#1e293b}
 .neta-trend-tbl tbody td:last-child{border-right:none}
 .neta-trend-tbl tbody tr:last-child td{border-bottom:none}
-.neta-trend-tbl tbody tr:hover td{background:#f0f5fb}
+.neta-trend-tbl tbody tr:hover td{background:#f0f5fb;cursor:pointer}
 /* 참고 배지 */
 .neta-ref-badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:700;margin:2px 3px 2px 0}
 /* 타임라인 */
@@ -1448,14 +1448,13 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   let hasMap=false;
   if(src){
     const region=src.region||'-';
-    const vendor=src.vendor?`<span class="neta-vendor-badge">${esc(src.vendor)}</span>`:'';
     const cid=src.cid?`<span style="font-size:10px;color:#64748b;display:block">CID: ${esc(src.cid)}</span>`:'';
     const lat=src.lat??null,lng=src.lng??null;
     const locSrc=lat!=null&&lng!=null?`<span style="font-size:10px;color:#94a3b8">${lat}, ${lng}</span>`:'';
     const mapDiv=lat!=null&&lng!=null?`<div id="${uid}-map" class="neta-leaflet-mini"></div>`:'';
     leftCol+=`<div class="neta-loc-section">
       <div class="neta-label">📍 주소 / 위치</div>
-      <div class="neta-value" style="font-weight:600;font-size:12px">${esc(region)}${vendor}</div>
+      <div class="neta-value" style="font-weight:600;font-size:12px">${esc(region)}</div>
       ${cid}${locSrc}${mapDiv}
     </div>`;
     if(lat!=null&&lng!=null){hasMap=true;setTimeout(()=>initNetaMiniMap(`${uid}-map`,lat,lng),80);}
@@ -1485,7 +1484,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
       {key:'no_rtp_cnt',label:'No-RTP',bg:'#dbeafe',color:'#2563eb'},
     ];
     rightCol+=`<div class="neta-cards-section">
-      <div class="neta-label">📊 ${src.year??''}-W${src.week??''}&nbsp;<span style="font-weight:700;color:${scoreColor(sc)}">이상점수 ${sc.toFixed?sc.toFixed(1):sc}</span></div>
+      <div class="neta-label">📊 ${src.year??''}-W${src.week??''}&nbsp;<span style="font-weight:700;color:${scoreColor(sc)}">이상지수 ${sc.toFixed?sc.toFixed(1):sc}</span></div>
       <div class="neta-info-cards">`;
     metrics.forEach(m=>{
       const val=src[m.key]??0;
@@ -2261,7 +2260,8 @@ function initNetaMiniMap(mapId,lat,lng){
   const m=L.map(mapId,{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false}).setView([lat,lng],13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
   const icon=L.divIcon({html:'<div style="background:#e74c3c;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',className:'',iconSize:[12,12],iconAnchor:[6,6]});
-  L.marker([lat,lng],{icon}).addTo(m);
+  const marker=L.marker([lat,lng],{icon}).addTo(m);
+  marker.bindPopup('<div style="font-size:11px;font-weight:700;color:#c0392b;white-space:nowrap">📍 예상위치</div>',{closeButton:false,offset:[0,-4]}).openPopup();
   el._leafletMap=m;
   setTimeout(()=>m.invalidateSize(),100);
 }
