@@ -335,6 +335,7 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 <script>
 let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
 let netaCache={}; // key: `${tacDec}|${pci}|${dlch}` → {data} | {promise}
+let netaWeeksCache={}; // key: operator → latest week number
 const RP=50;let charts=[];
 const SOUND_TYPES=[
   {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김',cat:'rx'},
@@ -438,7 +439,7 @@ function handleFile(file){
 }
 function loadSample(){doParse(SAMPLE,'sample.LOG');}
 function resetAll(){
-  allRows=[];allRlfEvents=[];rlfByRlfi={};netaCache={};charts.forEach(c=>c.destroy());charts=[];
+  allRows=[];allRlfEvents=[];rlfByRlfi={};netaCache={};netaWeeksCache={};charts.forEach(c=>c.destroy());charts=[];
   document.getElementById('dashboard').style.display='none';
   document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
@@ -1377,9 +1378,15 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
   const safeFetch=async(url)=>{try{const r=await fetch(url);return r.ok?await r.json():null;}catch{return null;}};
   const promise=Promise.all([doFetch(urlInfo),doFetch(urlTrend)]).then(async([info,trend])=>{
     // 참고 데이터 병렬 fetch (실패해도 무시)
-    const week=getISOWeek();
+    // pci-duplicates는 NETA에 실제 로드된 최신 주차를 사용해야 NETA와 동일한 결과가 나옴
+    if(!netaWeeksCache[operator]){
+      const wr=await safeFetch(`${NETA_BASE}/api/available-weeks?operator=${encodeURIComponent(operator)}`);
+      const ws=wr?.weeks||[];
+      netaWeeksCache[operator]=ws.length>0?ws[ws.length-1]:getISOWeek();
+    }
+    const latestWeek=netaWeeksCache[operator];
     const [pciDup,tauRej,rept,faResp,memo]=await Promise.all([
-      safeFetch(`${NETA_BASE}/api/pci-duplicates?week=${week}&operator=${encodeURIComponent(operator)}`),
+      safeFetch(`${NETA_BASE}/api/pci-duplicates?week=${latestWeek}&operator=${encodeURIComponent(operator)}`),
       safeFetch(`${NETA_BASE}/api/tau-reject-data`),
       safeFetch(`${NETA_BASE}/api/repeater-data`),
       safeFetch(`${NETA_BASE}/api/fa-data?operator=${encodeURIComponent(operator)}`),
