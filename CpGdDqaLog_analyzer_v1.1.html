@@ -607,6 +607,7 @@ function fNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
 function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;}
 function topVal(arr){if(!arr||!arr.length)return null;const cnt={};arr.forEach(v=>{cnt[v]=(cnt[v]||0)+1;});return Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0][0];}
 function isOne(v){return v==='1'||v===1;}
+function tacToDecStr(tac){const d=parseInt(tac,16);return isNaN(d)?String(tac||''):String(d);}
 function getCellKey(tac,pid,dch,lbnd){
   if(!tac&&!pid&&!dch&&!lbnd)return null;
   const nt=(tac||'').replace(/^0+/,'').toUpperCase()||'0';
@@ -854,7 +855,7 @@ function renderInsights(){
       const topC=topVal(causes);
       const causeTxt=topC?` / 주요 Cause: ${topC}${DROP_CAUSES[topC]?' ('+DROP_CAUSES[topC]+')':''}`:'';
       const suffix=pct>=50?' → 특정 기지국 문제 의심':'';
-      push(lv,`TAC ${topDropSt.tac} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
+      push(lv,`TAC ${tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
     }
   }
   if(dates.length>1){
@@ -913,7 +914,7 @@ function renderInsights(){
       const rsrpTxt=topMuteSt.avgRsrp!==null?` RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`:'';
       const sinrTxt=topMuteSt.avgSinr!==null?` SINR ${topMuteSt.avgSinr.toFixed(1)}dB`:'';
       const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-      push('warn',`TAC ${topMuteSt.tac} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`,'mute');
+      push('warn',`TAC ${tacToDecStr(topMuteSt.tac)} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`,'mute');
     }
   }
   const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
@@ -951,7 +952,7 @@ function renderInsights(){
     const rlfiRsrpAvg=topRlfSt&&topRlfSt.rlfiRsrp.length?parseFloat(avgArr(topRlfSt.rlfiRsrp).toFixed(1)):null;
     const rsrpTxt=rlfiRsrpAvg!==null?` RSRP ${rlfiRsrpAvg}dBm`:'';
     const sigTxt=rsrpTxt?` [전계:${rsrpTxt}]`:'';
-    const stTxt=topRlfSt?` — 집중 기지국: TAC ${topRlfSt.tac} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
+    const stTxt=topRlfSt?` — 집중 기지국: TAC ${tacToDecStr(topRlfSt.tac)} / PCI ${topRlfSt.pid} (${topRlfSt.rlfis.length}건)${sigTxt}`:'';
     push(rlfTotal>=7?'danger':'warn',`RLF 이벤트 ${rlfTotal}건 발생${stTxt}`,'radio');
   }
   if(dates.length>1&&allRlfEvents.length>=3){
@@ -989,7 +990,7 @@ function renderInsights(){
       const bandNum=getDchBand(top.dch);
       const bandTxt=bandNum!=null?` Band ${bandNum}`:(top.dch?` DLCh ${top.dch}`:'');
       const otherTxt=hotStations.length>1?` (외 ${hotStations.length-1}개 기지국 동일 패턴)`:'';
-      push('warn',`특정 기지국(TAC ${top.tac}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
+      push('warn',`특정 기지국(TAC ${tacToDecStr(top.tac)}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
     }
   }
   const scgfRows=byFeat('SCGF');
@@ -1005,7 +1006,7 @@ function renderInsights(){
       const [topTac,topPid]=topKey.split('|');
       const topDch=String(topKeyRows[0]?.DLCh||topKeyRows[0]?.DLCH||'').trim();
       const topBand=topDch?` / Band ${getDchBand(topDch)}`:'';
-      scgfStTxt=` - 집중 기지국 : TAC ${topTac}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
+      scgfStTxt=` - 집중 기지국 : TAC ${tacToDecStr(topTac)}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
     }
     push(scgfRows.length>=7?'danger':'warn',`SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
   }
@@ -1208,13 +1209,13 @@ function renderNoti(){
   const antDiffSt=Object.values(stationMap).filter(s=>s.hasAntDiff).sort((a,b)=>b.antDiffDrops.length-a.antDiffDrops.length);
   antDiffSt.forEach(s=>{
     const maxDiff=Math.max(...s.antDiffDrops.map(d=>d.diff)).toFixed(1);
-    html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
+    html+=`<div class="nc antdiff"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ttl">Ant Diff (HW 의심)</span><span class="nt">TAC ${tacToDecStr(s.tac)} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">RxP0-RxP1 차이 20dB 이상 ${s.antDiffDrops.length}건 · 최대 차이 ${maxDiff}dB</div><div class="ntags"><span class="tag ttl">Ant Diff ${s.antDiffDrops.length}건</span>${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}</div></div>`;
   });
   const stations=Object.values(stationMap).filter(s=>s.level!=='normal'&&s.probCount>0).sort((a,b)=>{const o={issue:0,weak_sig:1,inter:2,high_bler:3};return(b.score-a.score)||((o[a.level]??9)-(o[b.level]??9));});
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER'};
   const lc={issue:'tr',weak_sig:'ta',inter:'tp',high_bler:'tb'};
   stations.forEach(s=>{
-    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
+    html+=`<div class="nc ${s.level}"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge ${lc[s.level]}">${lbl[s.level]}</span><span class="nt">TAC ${tacToDecStr(s.tac)} / PCI ${s.pid} / Band ${s.band||s.dch}</span></div><div class="ns" style="margin-top:6px">문제 이벤트 ${s.probCount}건${s.avgRsrp!==null?' · RSRP '+s.avgRsrp:''}${s.avgSinr!==null?' / SINR '+s.avgSinr:''}</div><div class="ntags">${s.drops.length?`<span class="tag tr">DROP ${s.drops.length}건</span>`:''}${s.mutes.length?`<span class="tag ta">MUTE ${s.mutes.length}건</span>`:''}${s.rlfis.length?`<span class="tag tb">RLF ${s.rlfis.length}건</span>`:''}${s.cends.length?`<span class="tag tgr">CEND ${s.cends.length}건</span>`:''}${s.weakRsrp?`<span class="tag tp">RSRP ${s.avgRsrp}</span>`:''}${s.weakSinr?`<span class="tag tp">SINR ${s.avgSinr}</span>`:''}</div></div>`;
   });
   document.getElementById('notiArea').innerHTML=html||'<div class="no-data">이상 감지된 항목이 없습니다.</div>';
 }
@@ -1350,7 +1351,7 @@ function renderDropTab(){
       const adCnt=s.antDiffDrops.length;
       const wkCnt=s.drops.filter(r=>fNum(r.RxP0)!==null&&fNum(r.RxP0)<-100).length;
       html+=`<div class="bar-row">
-        <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${s.tac} / PCI ${s.pid} / Band ${s.band||s.dch}</div>
+        <div class="bar-label" style="width:210px"><span class="rank-badge${i<3?' r'+(i+1):''}" style="margin-right:5px">${i+1}</span>TAC ${tacToDecStr(s.tac)} / PCI ${s.pid} / Band ${s.band||s.dch}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${(s.drops.length/total*100).toFixed(1)}%;background:#e74c3c"></div></div>
         <div class="bar-val">${s.drops.length}건${adCnt?` &nbsp;<span class="badge ttl" style="font-size:10px">Ant Diff ${adCnt}</span>`:''}${wkCnt?` &nbsp;<span class="badge tp" style="font-size:10px">약전계 ${wkCnt}</span>`:''}</div>
       </div>`;
@@ -2324,7 +2325,7 @@ function updateStationMapMarkers(stations){
     const popup=`<div style="min-width:160px;font-family:'Pretendard',sans-serif">
       <div style="font-weight:700;color:${color};margin-bottom:4px;font-size:13px">${s.anomalyLevel} <span style="font-size:12px;font-weight:400">(${s.anomalyIndex}점)</span></div>
       <div style="line-height:1.7;font-size:12px;color:#334155">
-        TAC: <b>${s.tac}</b> | PCI: <b>${s.pid}</b><br>
+        TAC: <b>${tacToDecStr(s.tac)}</b> | PCI: <b>${s.pid}</b><br>
         Band: ${s.band||s.dch}<br>
         DROP: <span style="color:#c0392b;font-weight:600">${s.drops.length}</span>&nbsp;
         RLF: <span style="color:#1a6fa0;font-weight:600">${s.rlfis.length}</span>&nbsp;
