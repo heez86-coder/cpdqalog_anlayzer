@@ -253,7 +253,7 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
     </div>
     <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG / CSV 파일 열기</button>
     <button class="btn" onclick="pasteFromClipboard()" title="Superset 클립보드 붙여넣기"><i class="fa fa-clipboard"></i> Superset 클립보드 붙여넣기</button>
-    <button class="btn" onclick="loadSample()">샘플 데이터</button>
+    <button class="btn" id="saveResultBtn" onclick="saveResultHtml()" style="display:none" title="현재 분석 결과를 HTML 파일로 저장"><i class="fa fa-save"></i> 결과저장</button>
     <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
   </div>
   <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()"
@@ -334,6 +334,7 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 
 <script>
 let allRows=[],allCols=[],rawFiltered=[],rawPage=1,stationMap={},allRlfEvents=[],rlfByRlfi={};
+let rawLogText='',rawLogFilename='';
 let netaCache={}; // key: `${tacDec}|${pci}|${dlch}` → {data} | {promise}
 let netaWeeksCache={}; // key: operator → latest week number
 const RP=50;let charts=[];
@@ -438,11 +439,40 @@ function handleFile(file){
   }).catch(()=>alert('파일을 읽을 수 없습니다.'));
 }
 function loadSample(){doParse(SAMPLE,'sample.LOG');}
+function saveResultHtml(){
+  if(!rawLogText){alert('로드된 데이터가 없습니다.');return;}
+  let encoded;
+  try{encoded=btoa(unescape(encodeURIComponent(rawLogText)));}
+  catch(e){alert('저장 실패: 데이터 인코딩 오류\n'+e.message);return;}
+  const fname=JSON.stringify(rawLogFilename);
+  // 저장된 HTML이 열릴 때 자동으로 데이터를 재파싱하는 인라인 스크립트
+  const autoScript='<scr'+'ipt>(function(){'
+    +'var _d=function(){try{'
+    +'var t=decodeURIComponent(escape(atob("'+encoded+'")));'
+    +'if(typeof doParse==="function")doParse(t,'+fname+');'
+    +'}catch(e){console.error("결과저장 자동로드 실패",e);}};'
+    +'if(document.readyState==="loading")window.addEventListener("DOMContentLoaded",_d);'
+    +'else _d();'
+    +'})();<\/script>';
+  let html=document.documentElement.outerHTML;
+  html=html.replace(/<\/body>/i,autoScript+'</body>');
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  const dateStr=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const base=(rawLogFilename.replace(/\.[^.]+$/,'')||'분석결과').replace(/[<>:"/\\|?*]/g,'_');
+  a.download=base+'_분석결과_'+dateStr+'.html';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
 function resetAll(){
   allRows=[];allRlfEvents=[];rlfByRlfi={};netaCache={};netaWeeksCache={};charts.forEach(c=>c.destroy());charts=[];
+  rawLogText='';rawLogFilename='';
   document.getElementById('dashboard').style.display='none';
   document.getElementById('uploadBox').style.display='block';
   document.getElementById('resetBtn').style.display='none';
+  document.getElementById('saveResultBtn').style.display='none';
   document.getElementById('fileInput').value='';
   document.getElementById('logTitle').innerHTML='CpGdDqaLog Analyzer <span style="font-size:12px;font-weight:500;color:rgba(255,255,255,0.55);letter-spacing:0">v1.1</span>';
   document.getElementById('logPart').textContent='SQE2 Global 필드검증파트';
@@ -538,6 +568,7 @@ function parseCSV(text){
 }
 function doParse(text,filename){
   if(!text||!text.trim()){alert('파일 내용이 비어있습니다.');return;}
+  rawLogText=text;rawLogFilename=filename;
   // BOM 제거
   if(text.charCodeAt(0)===0xFEFF)text=text.slice(1);
   // LOG 형식 시도, 실패 시 CSV 시도
@@ -556,6 +587,7 @@ function doParse(text,filename){
   document.getElementById('uploadBox').style.display='none';
   document.getElementById('dashboard').style.display='block';
   document.getElementById('resetBtn').style.display='';
+  document.getElementById('saveResultBtn').style.display='';
   buildRlfEvents();
   stSortCol='default';stSortDir='desc';rawOpenIdx=new Set();
   renderHeader(filename);renderInsights();renderOverview();renderMuteTab();renderDropTab();renderDaily();
