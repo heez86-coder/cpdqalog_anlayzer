@@ -610,7 +610,7 @@ function isOne(v){return v==='1'||v===1;}
 function getCellKey(tac,pid,dch,lbnd){
   if(!tac&&!pid&&!dch&&!lbnd)return null;
   const nt=(tac||'').replace(/^0+/,'').toUpperCase()||'0';
-  const b=BAND_MAP[String(dch||'')];
+  const b=getDchBand(dch||'');
   const keyBand=b!=null?String(b):(lbnd||dch||'?');
   return`${nt}|${pid||'?'}|${keyBand}`;
 }
@@ -682,7 +682,7 @@ function buildStationMap(){
     const rxp=fNum(e.RxP0);if(rxp!==null)s.rlfiRsrp.push(rxp);
   });
   Object.values(stationMap).forEach(s=>{
-    const bNum=BAND_MAP[String(s.dch)];s.band=bNum!=null?String(bNum):(s.lbnd||s.dch||'');
+    const bNum=getDchBand(s.dch);s.band=bNum!=null?String(bNum):(s.dch||s.lbnd||'');
     const totalRef=s.cends.length+s.drops.length;
     s.probCount=s.drops.length+s.nonMicMutes.length+s.rlfis.length;
     s.dropRate=totalRef>0?(s.drops.length/totalRef*100):0;
@@ -986,7 +986,7 @@ function renderInsights(){
       const top=hotStations[0];
       const topCode=Object.entries(top.cntByCode).sort((a,b)=>b[1]-a[1])[0][0];
       const causeName=CAU_CODES[topCode]||'Unknown';
-      const bandNum=BAND_MAP[String(top.dch)];
+      const bandNum=getDchBand(top.dch);
       const bandTxt=bandNum!=null?` Band ${bandNum}`:(top.dch?` DLCh ${top.dch}`:'');
       const otherTxt=hotStations.length>1?` (외 ${hotStations.length-1}개 기지국 동일 패턴)`:'';
       push('warn',`특정 기지국(TAC ${top.tac}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
@@ -1937,6 +1937,19 @@ function buildRawRows(){
   return rows;
 }
 const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
+// BAND_MAP 정확 매칭 후 EARFCN 범위 기반 fallback (Band_MAP 누락 DLCh 대응)
+function getDchBand(dch){
+  const exact=BAND_MAP[String(dch??'')];
+  if(exact!=null)return exact;
+  const d=parseInt(dch);
+  if(isNaN(d)||d<=0)return null;
+  if(d<=599)return 1;           // Band 1 (2100 MHz): EARFCN 0–599
+  if(d>=1200&&d<=1949)return 3; // Band 3 (1800 MHz): EARFCN 1200–1949
+  if(d>=2400&&d<=2649)return 5; // Band 5 (850 MHz):  EARFCN 2400–2649
+  if(d>=2750&&d<=3449)return 7; // Band 7 (2600 MHz): EARFCN 2750–3449
+  if(d>=3450&&d<=3799)return 8; // Band 8 (900 MHz):  EARFCN 3450–3799
+  return null;
+}
 function getRawBandDLCh(r){
   if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?String(b):''}
   if(r.Feature==='SCGF'){
@@ -1945,7 +1958,7 @@ function getRawBandDLCh(r){
     return parts.join(' - ');
   }
   const dch=r.DLCh??'';if(!dch)return'';
-  const band=BAND_MAP[String(dch)];
+  const band=getDchBand(dch);
   return band!=null?`${band} (${dch})`:String(dch);
 }
 function getRawNote(r){
