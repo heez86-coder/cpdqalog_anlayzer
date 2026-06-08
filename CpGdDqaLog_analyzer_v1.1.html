@@ -966,6 +966,32 @@ function renderInsights(){
       }
     }
   }
+  // RLF Cause 집중 분석 — Cause 0 (Unknown) 또는 Cause 7 (Handover Failure)
+  {
+    const HO_CAUSES=new Set(['0','7']);
+    const causeStMap={};
+    allRlfEvents.forEach(e=>{
+      const cauVal=String(e.CAU??'').trim();
+      if(!HO_CAUSES.has(cauVal))return;
+      const tac=(e.TAC_||'').trim(),pid=(e.PhID||'').trim(),dch=(e.DLCh||'').trim();
+      if(!tac&&!pid)return;
+      const k=`${tac}|${pid}|${dch}`;
+      if(!causeStMap[k])causeStMap[k]={tac,pid,dch,cnt:0,cntByCode:{}};
+      causeStMap[k].cnt++;
+      causeStMap[k].cntByCode[cauVal]=(causeStMap[k].cntByCode[cauVal]||0)+1;
+    });
+    const hotStations=Object.values(causeStMap).filter(s=>s.cnt>=3);
+    if(hotStations.length>0){
+      hotStations.sort((a,b)=>b.cnt-a.cnt);
+      const top=hotStations[0];
+      const topCode=Object.entries(top.cntByCode).sort((a,b)=>b[1]-a[1])[0][0];
+      const causeName=CAU_CODES[topCode]||'Unknown';
+      const bandNum=BAND_MAP[String(top.dch)];
+      const bandTxt=bandNum!=null?` Band ${bandNum}`:(top.dch?` DLCh ${top.dch}`:'');
+      const otherTxt=hotStations.length>1?` (외 ${hotStations.length-1}개 기지국 동일 패턴)`:'';
+      push('warn',`특정 기지국(TAC ${top.tac}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
+    }
+  }
   const scgfRows=byFeat('SCGF');
   if(scgfRows.length>=3){
     const ftyps=scgfRows.map(r=>String(r.FTYP||r.FTyp||'').trim()).filter(Boolean);
