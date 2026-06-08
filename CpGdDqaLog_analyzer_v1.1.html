@@ -1570,7 +1570,8 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     rightCol+='</tbody></table></div></div>';
   }else{
     const msg=trendErr?`조회 실패: ${esc(trendErr)}`:'트렌드 데이터 없음';
-    rightCol+=`<div class="neta-trend-section"><div class="neta-label">📈 주간 트렌드</div><div style="font-size:12px;color:#94a3b8;padding:6px 0">${msg}</div></div>`;
+    const subMsg=trendErr?'':' <div style="font-size:11px;color:#b0bac8;margin-top:3px">최근 5주간 기지국 특이사항이 발견되지 않습니다</div>';
+    rightCol+=`<div class="neta-trend-section"><div class="neta-label">📈 주간 트렌드</div><div style="font-size:12px;color:#94a3b8;padding:6px 0">${msg}</div>${subMsg}</div>`;
   }
   rightCol+='</div>';
 
