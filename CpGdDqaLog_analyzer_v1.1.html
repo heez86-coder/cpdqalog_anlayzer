@@ -444,18 +444,13 @@ function saveResultHtml(){
   let encoded;
   try{encoded=btoa(unescape(encodeURIComponent(rawLogText)));}
   catch(e){alert('저장 실패: 데이터 인코딩 오류\n'+e.message);return;}
-  const fname=JSON.stringify(rawLogFilename);
-  // 저장된 HTML이 열릴 때 자동으로 데이터를 재파싱하는 인라인 스크립트
-  const autoScript='<scr'+'ipt>(function(){'
-    +'var _d=function(){try{'
-    +'var t=decodeURIComponent(escape(atob("'+encoded+'")));'
-    +'if(typeof doParse==="function")doParse(t,'+fname+');'
-    +'}catch(e){console.error("결과저장 자동로드 실패",e);}};'
-    +'if(document.readyState==="loading")window.addEventListener("DOMContentLoaded",_d);'
-    +'else _d();'
-    +'})();<\/script>';
+  const fnAttr=(rawLogFilename||'saved.LOG').replace(/"/g,'&quot;');
+  // <template>은 HTML 파서에 의해 렌더링/실행되지 않으므로 base64 데이터를 안전하게 저장
+  const dataTag='<template id="_savedLogData" data-fn="'+fnAttr+'">'+encoded+'</template>';
   let html=document.documentElement.outerHTML;
-  html=html.replace(/<\/body>/i,autoScript+'</body>');
+  // 기존에 저장된 template이 있으면 제거 후 새로 삽입
+  html=html.replace(/<template id="_savedLogData"[^>]*>[\s\S]*?<\/template>/i,'');
+  html=html.replace(/<\/body>/i,dataTag+'</body>');
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -2379,7 +2374,16 @@ function makeSVGSparkline(values,color){
   </svg>`;
 }
 
-
+// 저장된 HTML 파일 열릴 때 <template id="_savedLogData">의 base64 데이터를 자동 로드
+(function(){
+  var el=document.getElementById('_savedLogData');
+  if(!el)return;
+  var enc=el.textContent.trim(),fn=el.dataset.fn||'saved.LOG';
+  if(!enc)return;
+  function run(){try{doParse(decodeURIComponent(escape(atob(enc))),fn);}catch(e){console.error('저장파일 자동로드 실패',e);}}
+  if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',run);
+  else run();
+})();
 </script>
 </body>
 </html>
