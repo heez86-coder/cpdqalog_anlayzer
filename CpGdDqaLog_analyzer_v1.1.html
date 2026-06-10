@@ -1848,15 +1848,23 @@ function filterRaw(){
   const checked=[...document.querySelectorAll('.feat-chk:checked')].map(c=>c.value);
   const df=document.getElementById('rawDateFrom').value;
   const dt=document.getElementById('rawDateTo').value;
+  const callFeats=['CEND','DROP','MUTE','PSCI'];
+  const hasCallChk=callFeats.some(f=>checked.includes(f));
   rawFiltered=buildRawRows().filter(r=>{
-    if(!checked.includes(r.Feature))return false;
+    // 콜 그룹 소속 RLF는 통화 피처 체크 시 자동 포함 (통화 중 RLF 인라인 표시)
+    if(r.Feature==='RLF'){
+      const autoInclude=!!r._grpKey&&hasCallChk;
+      if(!autoInclude&&!checked.includes('RLF'))return false;
+    } else {
+      if(!checked.includes(r.Feature))return false;
+    }
     if(df&&r.Date<df)return false;
     if(dt&&r.Date>dt)return false;
     if(q&&!buildSearchStr(r).includes(q))return false;
     return true;
   });rawPage=1;rawOpenIdx=new Set();renderRaw();
 }
-const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'},ATTI:{bg:'#fdecea',tc:'#922b21'},ATTF:{bg:'#fdecea',tc:'#922b21'},MMRJ:{bg:'#fdf2f8',tc:'#8e44ad'}};
+const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},RLF:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'},ATTI:{bg:'#fdecea',tc:'#922b21'},ATTF:{bg:'#fdecea',tc:'#922b21'},MMRJ:{bg:'#fdf2f8',tc:'#8e44ad'}};
 const FEAT_DESC={ATTF:'LTE ATTACH 실패 시',ATTI:'LTE ATTACH 내부 오류 실패 시',ATTS:'LTE ATTACH 성공',CEND:'CALL END EVENT',CRSH:'CP CRASH 발생 시',DAST:'Data Stall 발생 시',DROP:'CALLDROP EVENT',ENST:'ENDC 상태 정보 (24시간마다 1회전송)',INTG:'CP 부팅 시',MIPI:'MIPI 오류',MLPM:'발열제어동작 Trigger/Release',MMRJ:'MM 수행 중 Reject 수신',MUTE:'CALL MUTE EVENT',NSVC:'단말 No SVC / Limited SVC 발생정보 (24시간 동안)',PDPF:'PDP 발신 실패 시',PDPI:'PDP 내부 에러 실패 시',PDPS:'PDP 발생 성공',RFPD:'PAM 문제로 인한 Tx Power 이슈 검출',RLFC:'RLF 및 RRC DCH count (24시간마다)',RLF:'RLF 발생정보 (RLFI Feature 이벤트 개별 적용)',SCGF:'SCG Failure 발생정보',SCGC:'SCG Add, Trial 카운트 (24시간마다)',SIMD:'SIM Detect, No SIM 이벤트 발생정보 (24시간 마다)',SMSI:'SMS 발신 내부오류 실패 시',SMSS:'SMS 발신 성공시',SMSF:'SMS 발신 실패 시',TFEI:'Timing Error / Frequency Error / XO Error 발생 시',UCOF:'UE Capa Info packet overflow 발생',TXDH:'Tx Device Hopping 시간 (24시간 기준)',UCSI:'LTE UE Capa Size로 인한 문제 발생',PSCI:'PS Call 종료시 통화관련 정보',REGI:'Registration Event',NRHT:'발열로 인한 LTE Fallback 이벤트',REST:'단말 재시작 이벤트'};
 function getDropRSRP(r){const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null?(a+b)/2:a;}
 function getDropSINR(r){const a=fNum(r.SNR0),b=fNum(r.SNR1);return a!==null&&b!==null?(a+b)/2:a;}
@@ -1924,18 +1932,20 @@ function buildRawRows(){
       if(ctim>0)rawWins.push({start:toSec(r)-ctim,end:toSec(r)});
     }
   });
-  // Step 1b: DROP 종료 통화용 보조 윈도우 (CEND 없는 경우)
-  // DROP 시각을 콜 종료로, MUTE의 CTIM으로 콜 시작 계산
-  const dropSecArr=rows.filter(r=>r.Feature==='DROP').map(d=>toSec(d)).sort((a,b)=>a-b);
+  // Step 1b: DROP 종료 통화용 보조 윈도우
+  // DROP 이벤트를 콜 종료 기준으로, DROP과 동시에(±2초) 올라오는
+  // PSCI/MUTE의 CTIM으로 콜 시작 시간 계산
   rows.forEach(r=>{
-    if(r.Feature!=='MUTE')return;
-    const ctim=parseInt(r.CTIM||0,10);if(ctim<=0)return;
-    const sec=toSec(r);
-    if(rawWins.some(w=>sec>=w.start&&sec<=w.end))return;
-    // MUTE 이후 300초 이내 DROP 중 CEND 윈도우에 속하지 않는 가장 가까운 것
-    const cands=dropSecArr.filter(ds=>ds>=sec&&ds<=sec+300&&!rawWins.some(w=>ds>=w.start&&ds<=w.end));
-    if(cands.length===0)return;
-    rawWins.push({start:sec-ctim,end:cands[0]});
+    if(r.Feature!=='DROP')return;
+    const dropSec=toSec(r);
+    if(rawWins.some(w=>dropSec>=w.start&&dropSec<=w.end))return;
+    const near=rows.find(x=>
+      (x.Feature==='MUTE'||x.Feature==='PSCI')&&
+      Math.abs(toSec(x)-dropSec)<=2&&
+      parseInt(x.CTIM||0,10)>0
+    );
+    if(!near)return;
+    rawWins.push({start:dropSec-parseInt(near.CTIM,10),end:dropSec});
   });
   rawWins.sort((a,b)=>a.start-b.start);
   const callWindows=[];
@@ -2105,27 +2115,7 @@ function renderRaw(){
         </div></td></tr>`;
     } else {
       const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&!k.startsWith('_')&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
-      const kvDiv=`<div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div>`;
-      let rlfCallHtml='';
-      if(r._grpKey){
-        const grpRlf=buildRawRows().filter(x=>x._grpKey===r._grpKey&&x.Feature==='RLF');
-        if(grpRlf.length>0){
-          const thS='style="padding:4px 8px;background:#ddeeff;font-weight:600;font-size:11px;border-bottom:1px solid #c0d8f0"';
-          const tdS='style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8"';
-          const rlfTrs=grpRlf.map((e,idx)=>{
-            const cauVal=String(e.CAU??'').trim();
-            const cauLabel=cauVal!==''?(CAU_CODES[cauVal]||'Code '+cauVal):'';
-            const cauColor={'1':'#c0392b','2':'#c0392b','4':'#c0392b','5':'#c0392b','7':'#e67e22','6':'#e67e22','3':'#8e44ad','8':'#7f8c8d','0':'#aaa'}[cauVal]||'#aaa';
-            return`<tr><td ${tdS}>${idx+1}</td><td ${tdS}>${e.Date??''}</td><td ${tdS}>${e.Time??''}</td><td ${tdS}>${e.TAC_??'-'}</td><td ${tdS}>${e.PhID??'-'}</td><td ${tdS}>${e.DLCh??'-'}</td><td ${tdS}>${e.RxP0??'-'}</td><td ${tdS}>${cauVal!==''?'<span style="font-weight:600;color:'+cauColor+'">['+cauVal+'] '+cauLabel+'</span>':'-'}</td><td ${tdS}>${e.PLMN??'-'}</td></tr>`;
-          }).join('');
-          rlfCallHtml=`<div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:4px">📡 통화 중 RLF 이벤트 ${grpRlf.length}건</div><table style="border-collapse:collapse;width:auto"><thead><tr><th ${thS}>No</th><th ${thS}>날짜</th><th ${thS}>시간</th><th ${thS}>TAC</th><th ${thS}>PCI</th><th ${thS}>DLCh</th><th ${thS}>RxP</th><th ${thS}>원인(CAU)</th><th ${thS}>PLMN</th></tr></thead><tbody>${rlfTrs}</tbody></table></div>`;
-        }
-      }
-      if(rlfCallHtml){
-        detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}"><div style="padding:10px 14px;background:#f8fafc;border-top:1px solid #e2e8f0">${kvDiv}${rlfCallHtml}</div></td></tr>`;
-      } else {
-        detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}">${kvDiv}</td></tr>`;
-      }
+      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
     }
     return mainRow+detailRow;
   }).join(''):`<tr><td colspan="${RAW_FIXED.length+2}" class="no-data">데이터 없음</td></tr>`;
