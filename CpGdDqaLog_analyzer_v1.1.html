@@ -824,7 +824,7 @@ function renderInsights(){
   const el=document.getElementById('insightContent');
   if(!el||!allRows.length){if(el)el.innerHTML='';return;}
   const items=[];
-  const push=(lv,t,grp)=>items.push({lv,t,grp});
+  const push=(lv,t,grp)=>items.push({lv,t:t.replace(/ — /g,' → '),grp});
   const totalDrop=byFeat('DROP').length,totalCend=byFeat('CEND').length,totalCall=totalDrop+totalCend;
   const dates=getDates();
   const PATH_LBL={'1':'Speaker','2':'Earjack','3':'Bluetooth'};
@@ -1915,15 +1915,30 @@ function buildRawRows(){
     return r._sec;
   };
   rows.forEach(r=>{r._grpKey=null;toSec(r);});
-  // Step 1: CEND+CTIM 기반 통화 윈도우 그룹
+  // Step 1: CEND+CTIM 기반 통화 윈도우
   let gid=0;
-  const callWindows=[];
+  const rawWins=[];
   rows.forEach(r=>{
     if(r.Feature==='CEND'){
       const ctim=parseInt(r.CTIM||0,10);
-      if(ctim>0)callWindows.push({start:toSec(r)-ctim,end:toSec(r),gid:gid++});
+      if(ctim>0)rawWins.push({start:toSec(r)-ctim,end:toSec(r)});
     }
   });
+  // Step 1b: MUTE+CTIM 보조 윈도우 (DROP 종료 통화 — CEND 없는 경우)
+  rows.forEach(r=>{
+    if(r.Feature==='MUTE'){
+      const ctim=parseInt(r.CTIM||0,10);if(ctim<=0)return;
+      const sec=toSec(r);
+      if(rawWins.some(w=>sec>=w.start&&sec<=w.end))return;
+      rawWins.push({start:sec-ctim,end:sec+300});
+    }
+  });
+  rawWins.sort((a,b)=>a.start-b.start);
+  const callWindows=[];
+  for(const w of rawWins){
+    if(callWindows.length>0){const last=callWindows[callWindows.length-1];if(w.start<=last.end){last.end=Math.max(last.end,w.end);continue;}}
+    callWindows.push({start:w.start,end:w.end,gid:gid++});
+  }
   if(callWindows.length>0){
     rows.forEach(r=>{
       const s=toSec(r);
@@ -2086,7 +2101,27 @@ function renderRaw(){
         </div></td></tr>`;
     } else {
       const kvPairs=Object.entries(r).filter(([k])=>!SKIP_KEYS.has(k)&&!k.startsWith('_')&&r[k]!==''&&r[k]!==null&&r[k]!==undefined);
-      detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}"><div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div></td></tr>`;
+      const kvDiv=`<div class="detail-grid">${kvPairs.map(([k,v])=>`<div class="detail-kv"><span class="detail-k">${k}</span><span class="detail-v">${v}</span></div>`).join('')}</div>`;
+      let rlfCallHtml='';
+      if(r._grpKey){
+        const grpRlf=buildRawRows().filter(x=>x._grpKey===r._grpKey&&x.Feature==='RLF');
+        if(grpRlf.length>0){
+          const thS='style="padding:4px 8px;background:#ddeeff;font-weight:600;font-size:11px;border-bottom:1px solid #c0d8f0"';
+          const tdS='style="padding:4px 8px;font-size:11px;border-bottom:1px solid #eef2f8"';
+          const rlfTrs=grpRlf.map((e,idx)=>{
+            const cauVal=String(e.CAU??'').trim();
+            const cauLabel=cauVal!==''?(CAU_CODES[cauVal]||'Code '+cauVal):'';
+            const cauColor={'1':'#c0392b','2':'#c0392b','4':'#c0392b','5':'#c0392b','7':'#e67e22','6':'#e67e22','3':'#8e44ad','8':'#7f8c8d','0':'#aaa'}[cauVal]||'#aaa';
+            return`<tr><td ${tdS}>${idx+1}</td><td ${tdS}>${e.Date??''}</td><td ${tdS}>${e.Time??''}</td><td ${tdS}>${e.TAC_??'-'}</td><td ${tdS}>${e.PhID??'-'}</td><td ${tdS}>${e.DLCh??'-'}</td><td ${tdS}>${e.RxP0??'-'}</td><td ${tdS}>${cauVal!==''?'<span style="font-weight:600;color:'+cauColor+'">['+cauVal+'] '+cauLabel+'</span>':'-'}</td><td ${tdS}>${e.PLMN??'-'}</td></tr>`;
+          }).join('');
+          rlfCallHtml=`<div style="margin-top:8px"><div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:4px">📡 통화 중 RLF 이벤트 ${grpRlf.length}건</div><table style="border-collapse:collapse;width:auto"><thead><tr><th ${thS}>No</th><th ${thS}>날짜</th><th ${thS}>시간</th><th ${thS}>TAC</th><th ${thS}>PCI</th><th ${thS}>DLCh</th><th ${thS}>RxP</th><th ${thS}>원인(CAU)</th><th ${thS}>PLMN</th></tr></thead><tbody>${rlfTrs}</tbody></table></div>`;
+        }
+      }
+      if(rlfCallHtml){
+        detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}"><div style="padding:10px 14px;background:#f8fafc;border-top:1px solid #e2e8f0">${kvDiv}${rlfCallHtml}</div></td></tr>`;
+      } else {
+        detailRow=`<tr class="detail-row"><td colspan="${RAW_FIXED.length+2}">${kvDiv}</td></tr>`;
+      }
     }
     return mainRow+detailRow;
   }).join(''):`<tr><td colspan="${RAW_FIXED.length+2}" class="no-data">데이터 없음</td></tr>`;
@@ -2230,6 +2265,7 @@ function showTab(name){
   if(name==='trend')renderTrend();
   if(name==='station')renderStationTable();
   if(name==='drop')renderDropTab();
+  if(name==='raw'&&rawFiltered.length>0){const total=Math.ceil(rawFiltered.length/RP);rawPage=total;renderRaw();}
 }
 (function(){
   const tip=document.createElement('div');
