@@ -1929,7 +1929,7 @@ function buildRawRows(){
   rows.forEach(r=>{
     if(r.Feature==='CEND'){
       const ctim=parseInt(r.CTIM||0,10);
-      if(ctim>0)rawWins.push({start:toSec(r)-ctim,end:toSec(r)});
+      if(ctim>0)rawWins.push({start:toSec(r)-ctim,end:toSec(r)+2});
     }
   });
   // Step 1b: DROP 종료 통화용 보조 윈도우
@@ -1945,7 +1945,7 @@ function buildRawRows(){
       parseInt(x.CTIM||0,10)>0
     );
     if(!near)return;
-    rawWins.push({start:dropSec-parseInt(near.CTIM,10),end:dropSec});
+    rawWins.push({start:dropSec-parseInt(near.CTIM,10),end:dropSec+2});
   });
   rawWins.sort((a,b)=>a.start-b.start);
   const callWindows=[];
