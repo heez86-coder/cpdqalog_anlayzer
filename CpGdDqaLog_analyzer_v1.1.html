@@ -1924,14 +1924,18 @@ function buildRawRows(){
       if(ctim>0)rawWins.push({start:toSec(r)-ctim,end:toSec(r)});
     }
   });
-  // Step 1b: MUTE+CTIM 보조 윈도우 (DROP 종료 통화 — CEND 없는 경우)
+  // Step 1b: DROP 종료 통화용 보조 윈도우 (CEND 없는 경우)
+  // DROP 시각을 콜 종료로, MUTE의 CTIM으로 콜 시작 계산
+  const dropSecArr=rows.filter(r=>r.Feature==='DROP').map(d=>toSec(d)).sort((a,b)=>a-b);
   rows.forEach(r=>{
-    if(r.Feature==='MUTE'){
-      const ctim=parseInt(r.CTIM||0,10);if(ctim<=0)return;
-      const sec=toSec(r);
-      if(rawWins.some(w=>sec>=w.start&&sec<=w.end))return;
-      rawWins.push({start:sec-ctim,end:sec+300});
-    }
+    if(r.Feature!=='MUTE')return;
+    const ctim=parseInt(r.CTIM||0,10);if(ctim<=0)return;
+    const sec=toSec(r);
+    if(rawWins.some(w=>sec>=w.start&&sec<=w.end))return;
+    // MUTE 이후 300초 이내 DROP 중 CEND 윈도우에 속하지 않는 가장 가까운 것
+    const cands=dropSecArr.filter(ds=>ds>=sec&&ds<=sec+300&&!rawWins.some(w=>ds>=w.start&&ds<=w.end));
+    if(cands.length===0)return;
+    rawWins.push({start:sec-ctim,end:cands[0]});
   });
   rawWins.sort((a,b)=>a.start-b.start);
   const callWindows=[];
