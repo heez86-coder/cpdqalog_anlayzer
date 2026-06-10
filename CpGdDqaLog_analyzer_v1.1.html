@@ -832,6 +832,24 @@ function renderInsights(){
   const muteRows=byFeat('MUTE');
   const dropRows=byFeat('DROP');
 
+  // ── 통화 요약 ─────────────────────────────────────────
+  if(totalCend>0){
+    // 일평균 통화횟수
+    const dayCount=dates.length||1;
+    const avgCalls=(totalCend/dayCount).toFixed(1);
+    const ctimVals=byFeat('CEND').map(r=>parseInt(r.CTIM||0,10)).filter(v=>v>0);
+    const avgCtimTxt=ctimVals.length>0?` (평균 통화 시간 ${(ctimVals.reduce((s,v)=>s+v,0)/ctimVals.length).toFixed(1)}초)`:'';
+    push('info',`일평균 통화횟수 ${avgCalls}회${avgCtimTxt}`,'call');
+    // 통화 PATH 분포 (AUST: 1=스피커폰, 2=이어폰, 3=BT, 기타=리시버)
+    const pathCnt={rcv:0,ear:0,bt:0,spk:0};
+    byFeat('CEND').forEach(r=>{
+      const a=String(r.AUST??'').trim();
+      if(a==='1')pathCnt.spk++;else if(a==='2')pathCnt.ear++;else if(a==='3')pathCnt.bt++;else pathCnt.rcv++;
+    });
+    const pctOf=n=>Math.round(n/totalCend*100);
+    push('info',`주사용 통화PATH : 리시버 ${pctOf(pathCnt.rcv)}%, 이어폰 ${pctOf(pathCnt.ear)}%, BT ${pctOf(pathCnt.bt)}%, 스피커폰 ${pctOf(pathCnt.spk)}%`,'call');
+  }
+
   // ── Calldrop ─────────────────────────────────────────
   if(totalCall>0){
     const dr=totalDrop/totalCall*100;
@@ -1050,7 +1068,7 @@ function renderInsights(){
 
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
-  const GRP_LBL={drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
+  const GRP_LBL={call:'📞 통화요약',drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
   const grouped=[];let curGrpG=null,curItemsG=[];
   items.forEach(it=>{
     if(it.grp!==curGrpG){if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});curGrpG=it.grp;curItemsG=[it];}
