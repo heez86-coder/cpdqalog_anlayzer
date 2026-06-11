@@ -183,7 +183,9 @@ input[type=text]:focus,select:focus{border-color:var(--blue-500)}
 .i-warn{background:#fff8ef;border-left-color:#e67e22;color:#7d4100}
 .i-info{background:#eef4ff;border-left-color:#2980b9;color:#1a4870}
 .i-good{background:#f0faf3;border-left-color:#1e8449;color:#1a5235}
+.i-hotspot{background:#f3eeff;border-left:5px solid #6d28d9;color:#4c1d95;font-weight:700}
 .i-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;margin-top:5px}
+.i-hotspot .i-dot{width:9px;height:9px;margin-top:4px}
 /* NETA 확장 패널 */
 .neta-expand-row td{padding:0!important;background:#fff!important}
 .neta-panel{padding:14px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;border-top:2px solid #2980b9;background:#fff}
@@ -902,7 +904,7 @@ function renderInsights(){
   {
     const sipr1115=dropRows.filter(r=>String(r.SIPR||'').trim()==='1115');
     if(sipr1115.length>=3)
-      push('warn',`TAU Reject(#9)으로 인한 통화중 Calldrop ${sipr1115.length}회 발생 : TAC 경계지역에서의 H/O Pingpong 원인`,'drop');
+      push('hotspot',`TAU Reject(#9)으로 인한 통화중 Calldrop ${sipr1115.length}회 발생 : TAC 경계지역에서의 H/O Pingpong 원인`,'drop');
   }
 
   // ── 음성품질 (MUTE) ───────────────────────────────────
@@ -1009,7 +1011,7 @@ function renderInsights(){
       const bandNum=getDchBand(top.dch);
       const bandTxt=bandNum!=null?` Band ${bandNum}`:(top.dch?` DLCh ${top.dch}`:'');
       const otherTxt=hotStations.length>1?` (외 ${hotStations.length-1}개 기지국 동일 패턴)`:'';
-      push('warn',`특정 기지국(TAC ${tacToDecStr(top.tac)}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
+      push('hotspot',`특정 기지국(TAC ${tacToDecStr(top.tac)}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
     }
   }
   const scgfRows=byFeat('SCGF');
