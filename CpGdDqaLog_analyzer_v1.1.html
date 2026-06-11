@@ -235,11 +235,11 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 .tl-row{display:flex;align-items:center;height:22px}
 .tl-label{width:52px;font-size:10px;font-weight:700;flex-shrink:0;padding-right:4px;text-align:right}
 .tl-track{flex:1;position:relative;height:22px;border-bottom:1px solid #f0f0f0}
-.tl-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);cursor:default;top:7px;opacity:.8;transition:opacity .1s}
+.tl-dot{position:absolute;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);cursor:default;top:7px;opacity:.8;transition:opacity .1s;z-index:1}
 .tl-dot:hover{opacity:1;z-index:2}
-.tl-sep{position:absolute;top:0;bottom:0;border-left:1px dashed #d0d5dd;pointer-events:none}
-.tl-daylbl{position:absolute;top:-17px;font-size:9px;color:#94a3b8;transform:translateX(-50%);white-space:nowrap}
-.tl-axis{position:relative;height:16px;margin-left:52px}
+.tl-sep{position:absolute;top:0;bottom:0;border-left:1px dashed #e2e8f0;pointer-events:none}
+.tl-daylbl{position:absolute;top:2px;font-size:9px;font-weight:600;color:#475569;transform:translateX(-50%);white-space:nowrap}
+.tl-axis{position:relative;height:18px;margin-left:52px;border-bottom:2px solid #e2e8f0;margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -1149,15 +1149,21 @@ function renderTimeline(){
   const xPct=ms=>(((ms-minMs)/span)*100).toFixed(3)+'%';
   const dates=getDates();
   const activeFeats=TL_FEATS.filter(f=>rows.some(r=>r.Feature===f));
-  // Day separator axis
-  let axisHtml='<div class="tl-axis">';
-  dates.forEach((d,i)=>{
+  // 날짜 구분선 위치 계산
+  const sepPositions=[];
+  dates.forEach(d=>{
     const ms=new Date(d+'T00:00:00').getTime();
     if(ms<minMs||ms>maxMs+1)return;
-    const p=xPct(Math.max(ms,minMs));
-    axisHtml+=`<div class="tl-sep" style="left:${p}"></div><div class="tl-daylbl" style="left:${p}">${d.slice(5).replace('-','/')}</div>`;
+    sepPositions.push({p:xPct(Math.max(ms,minMs)),label:d.slice(5).replace('-','/')});
+  });
+  // 날짜 축 (상단)
+  let axisHtml='<div class="tl-axis">';
+  sepPositions.forEach(({p,label})=>{
+    axisHtml+=`<div class="tl-sep" style="left:${p}"></div><div class="tl-daylbl" style="left:${p}">${label}</div>`;
   });
   axisHtml+='</div>';
+  // 구분선 HTML (각 track에 삽입)
+  const trackSeps=sepPositions.map(({p})=>`<div class="tl-sep" style="left:${p}"></div>`).join('');
   // Feature rows
   let rowsHtml='';
   activeFeats.forEach(feat=>{
@@ -1169,7 +1175,7 @@ function renderTimeline(){
       const tip=buildTlTip(r);
       dots+=`<span class="tl-dot" style="left:${xPct(ms)};background:${color}" data-tip="${tip}"></span>`;
     });
-    rowsHtml+=`<div class="tl-row"><div class="tl-label" style="color:${color}">${feat}</div><div class="tl-track">${dots}</div></div>`;
+    rowsHtml+=`<div class="tl-row"><div class="tl-label" style="color:${color}">${feat}</div><div class="tl-track">${trackSeps}${dots}</div></div>`;
   });
   inner.innerHTML=axisHtml+rowsHtml;
 }
