@@ -1011,7 +1011,7 @@ function renderInsights(){
       const bandNum=getDchBand(top.dch);
       const bandTxt=bandNum!=null?` Band ${bandNum}`:(top.dch?` DLCh ${top.dch}`:'');
       const otherTxt=hotStations.length>1?` (외 ${hotStations.length-1}개 기지국 동일 패턴)`:'';
-      push('hotspot',`특정 기지국(TAC ${tacToDecStr(top.tac)}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
+      push('hotspot',`[RLF] 특정 기지국(TAC ${tacToDecStr(top.tac)}, PCI ${top.pid},${bandTxt})에서 ${causeName} ${top.cnt}회 발생 : 특정 기지국 간 H/O Configuration 이상여부 확인필요${otherTxt}`,'radio');
     }
   }
   const scgfRows=byFeat('SCGF');
@@ -1029,14 +1029,14 @@ function renderInsights(){
       const topBand=topDch?` / Band ${getDchBand(topDch)}`:'';
       scgfStTxt=` - 집중 기지국 : TAC ${tacToDecStr(topTac)}${topPid?' / PCI '+topPid:''}${topBand} (${Math.round(topKeyRows.length/scgfRows.length*100)}%)`;
     }
-    push(scgfRows.length>=7?'danger':'warn',`SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
+    push(scgfRows.length>=7?'danger':'warn',`[SCGF] SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
   }
   const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
   if(antDropTotal>0)push('warn',`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`,'radio');
   const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
   const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
-  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`전체 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
-  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
+  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`[전계] 전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`[전계] 전체 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
+  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`[전계] 전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
 
   // ── 단말 / 망 이슈 ────────────────────────────────────
   const crshRows=byFeat('CRSH');
@@ -1076,7 +1076,7 @@ function renderInsights(){
 
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
-  const GRP_LBL={call:'📞 통화요약',drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCG)',device:'🔧 단말 / 망 이슈'};
+  const GRP_LBL={call:'📞 통화요약',drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCGF)',device:'🔧 단말 / 망 이슈'};
   const grouped=[];let curGrpG=null,curItemsG=[];
   items.forEach(it=>{
     if(it.grp!==curGrpG){if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});curGrpG=it.grp;curItemsG=[it];}
