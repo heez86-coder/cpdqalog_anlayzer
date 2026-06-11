@@ -575,7 +575,7 @@ function doParse(text,filename){
   const tlC=document.getElementById('tlChevron');if(tlC)tlC.textContent='▼';
   showTab('overview');
 }
-function getDates(){return[...new Set(allRows.map(r=>r.Date))].sort();}
+function getDates(){const norm=d=>d.replace(/\//g,'-').split('-').map((p,i)=>i>0?p.padStart(2,'0'):p).join('-');return[...new Set(allRows.map(r=>r.Date))].sort((a,b)=>norm(a).localeCompare(norm(b)));}
 function byDate(d){return allRows.filter(r=>r.Date===d);}
 function byFeat(f,rows){return(rows||allRows).filter(r=>r.Feature===f);}
 function cnt(f,rows){return byFeat(f,rows).length;}
@@ -1058,7 +1058,7 @@ function renderInsights(){
 
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
-  const GRP_LBL={call:'📞 통화요약',drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCGF)',device:'🔧 단말 / 망 이슈'};
+  const GRP_LBL={call:'📞 통화요약',drop:'📵 Calldrop',mute:'🔇 음성품질 (MUTE)',radio:'📡 무선품질 (RLF/SCGF)',device:'🔧 단말 / 망등록 이슈'};
   const grouped=[];let curGrpG=null,curItemsG=[];
   items.forEach(it=>{
     if(it.grp!==curGrpG){if(curItemsG.length)grouped.push({grp:curGrpG,items:curItemsG});curGrpG=it.grp;curItemsG=[it];}
@@ -1365,7 +1365,7 @@ function renderDropTab(){
   const plmnFmt=p=>{const raw=(p||'').replace(/[^0-9]/g,'');return raw?raw+(PLMN_OP[raw]?'('+PLMN_OP[raw]+')':''):'';};
   html+=`<div class="divider"></div><div class="st">일별 DROP 현황</div>`;
   getDates().forEach(d=>{
-    const dRows=byFeat('DROP',byDate(d));if(!dRows.length)return;
+    const dRows=byFeat('DROP',byDate(d)).sort((a,b)=>a.Time.localeCompare(b.Time));if(!dRows.length)return;
     const r0=dRows.map(getDropRSRP).filter(v=>v!==null);
     const s0=dRows.map(getDropSINR).filter(v=>v!==null);
     const ad=dRows.filter(r=>{const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null&&Math.abs(a-b)>=20;});
