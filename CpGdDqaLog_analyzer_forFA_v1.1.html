@@ -249,12 +249,14 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
       <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:4px;display:none" id="modelVerLine"></div>
       <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);margin-top:4px" id="chipsetLine" style="display:none"></div>
     </div>
-    <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG / CSV 파일 열기</button>
-    <button class="btn" onclick="pasteFromClipboard()" title="Superset 클립보드 붙여넣기"><i class="fa fa-clipboard"></i> Superset 클립보드 붙여넣기</button>
-    <button class="btn" id="saveResultBtn" onclick="saveResultHtml()" style="display:none" title="현재 분석 결과를 HTML 파일로 저장"><i class="fa fa-save"></i> 결과저장</button>
-    <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
-      <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
-      <div style="font-size:9.5px;font-weight:800;color:#b91c1c;letter-spacing:0.13em;padding:2px 9px;border:1.5px solid #b91c1c;border-radius:3px;opacity:0.82;user-select:none">CONFIDENTIAL</div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-p" onclick="document.getElementById('fileInput').click()">LOG / CSV 파일 열기</button>
+        <button class="btn" onclick="pasteFromClipboard()" title="Superset 클립보드 붙여넣기"><i class="fa fa-clipboard"></i> Superset 클립보드 붙여넣기</button>
+        <button class="btn" id="saveResultBtn" onclick="saveResultHtml()" style="display:none" title="현재 분석 결과를 HTML 파일로 저장"><i class="fa fa-save"></i> 결과저장</button>
+        <button class="btn" id="resetBtn" onclick="resetAll()" style="display:none">다시 로드</button>
+      </div>
+      <div style="font-size:10px;font-weight:900;color:#b91c1c;letter-spacing:0.18em;padding:3px 12px;border:2px solid #b91c1c;border-radius:4px;background:rgba(255,255,255,0.93);user-select:none;text-transform:uppercase;box-shadow:0 1px 4px rgba(0,0,0,0.18)">CONFIDENTIAL</div>
     </div>
   </div>
   <div class="upload-box" id="uploadBox" onclick="document.getElementById('fileInput').click()"
