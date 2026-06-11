@@ -1035,8 +1035,8 @@ function renderInsights(){
   if(antDropTotal>0)push('warn',`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`,'radio');
   const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
   const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
-  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`[전계] 전체 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`[전계] 전체 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
-  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`[전계] 전체 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
+  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`[RLF] 전계 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`[RLF] 전계 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
+  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`[RLF] 전계 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
 
   // ── 단말 / 망 이슈 ────────────────────────────────────
   const crshRows=byFeat('CRSH');
