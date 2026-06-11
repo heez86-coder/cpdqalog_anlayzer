@@ -886,6 +886,10 @@ function renderInsights(){
     if(sipr1115.length>=3)
       push('hotspot',`TAU Reject(#9)으로 인한 통화중 Calldrop ${sipr1115.length}회 발생 : TAC 경계지역에서의 H/O Pingpong 원인`,'drop');
   }
+  {
+    const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
+    if(antDropTotal>0)push('warn',`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`,'drop');
+  }
 
   // ── 음성품질 (MUTE) ───────────────────────────────────
   if(muteRows.length>=2){
@@ -1011,8 +1015,6 @@ function renderInsights(){
     }
     push(scgfRows.length>=7?'danger':'warn',`[SCGF] SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
   }
-  const antDropTotal=stList.reduce((s,st)=>s+(st.antDiffDrops?st.antDiffDrops.length:0),0);
-  if(antDropTotal>0)push('warn',`Ant Diff Calldrop ${antDropTotal}건 발생 — 안테나 확인 필요`,'drop');
   const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
   const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
   if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`[RLF] 전계 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`[RLF] 전계 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
