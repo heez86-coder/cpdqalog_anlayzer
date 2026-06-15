@@ -1982,9 +1982,7 @@ function buildRawRows(){
       const s=toSec(r);
       for(const w of callWindows){if(s>=w.start&&s<=w.end){r._grpKey='grp'+w.gid;break;}}
     });
-    const gcnt={};
-    rows.forEach(r=>{if(r._grpKey)gcnt[r._grpKey]=(gcnt[r._grpKey]||0)+1;});
-    rows.forEach(r=>{if(r._grpKey&&gcnt[r._grpKey]<=1)r._grpKey=null;});
+    // CEND+CTIM(또는 DROP+인접 CTIM)으로 도출된 윈도우는 단일 행이라도 정상통화로 유지
   }
   // Step 2: 윈도우 밖 GROUP_FEATS는 2초 근접 그룹핑
   const GROUP_FEATS=new Set(['MUTE','CEND','DROP','PSCI']);
