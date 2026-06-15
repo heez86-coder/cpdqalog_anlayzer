@@ -1840,11 +1840,19 @@ function filterRaw(){
   const df=document.getElementById('rawDateFrom').value;
   const dt=document.getElementById('rawDateTo').value;
   const callFeats=['CEND','DROP','MUTE','PSCI'];
-  const hasCallChk=callFeats.some(f=>checked.includes(f));
-  rawFiltered=buildRawRows().filter(r=>{
-    // 콜 그룹 소속 RLF는 통화 피처 체크 시 자동 포함 (통화 중 RLF 인라인 표시)
+  const allRaw=buildRawRows();
+  // 각 통화 그룹이 포함하는 통화 피처 집합 — 같은 그룹의 통화 피처가 체크된 경우에만 RLF 자동 포함
+  const grpFeats={};
+  allRaw.forEach(r=>{
+    if(r._grpKey&&callFeats.includes(r.Feature)){
+      (grpFeats[r._grpKey]||(grpFeats[r._grpKey]=new Set())).add(r.Feature);
+    }
+  });
+  rawFiltered=allRaw.filter(r=>{
+    // 콜 그룹 소속 RLF는 같은 그룹의 통화 피처가 체크된 경우에만 자동 포함
     if(r.Feature==='RLF'){
-      const autoInclude=!!r._grpKey&&hasCallChk;
+      const grpFs=r._grpKey?grpFeats[r._grpKey]:null;
+      const autoInclude=!!grpFs&&[...grpFs].some(f=>checked.includes(f));
       if(!autoInclude&&!checked.includes('RLF'))return false;
     } else {
       if(!checked.includes(r.Feature))return false;
