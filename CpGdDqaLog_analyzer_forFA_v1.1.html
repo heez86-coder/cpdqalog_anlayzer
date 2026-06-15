@@ -1973,7 +1973,15 @@ function buildRawRows(){
     const pcnt={};
     grpRows.forEach(r=>pcnt[r._proxIdx]=(pcnt[r._proxIdx]||0)+1);
     grpRows.forEach(r=>{r._grpKey=pcnt[r._proxIdx]>1?('grp'+(gid+r._proxIdx)):null;});
+    gid+=pid+1;
   }
+  // Step 3: 끝까지 그룹화되지 않은 통화 종료 이벤트(CEND/DROP)는 단독 통화로 처리
+  // CTIM 없는 CEND나 인접 CTIM 없는 DROP도 1통화로 인식되어 Call# 부여
+  rows.forEach(r=>{
+    if(!r._grpKey&&(r.Feature==='CEND'||r.Feature==='DROP')){
+      r._grpKey='grp'+(gid++);
+    }
+  });
   return rows;
 }
 const BAND_MAP={'100':1,'275':1,'475':1,'1350':3,'1550':3,'1694':3,'2500':5,'2600':5,'2850':7,'3050':7,'3200':7,'3743':8};
