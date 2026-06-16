@@ -1084,6 +1084,10 @@ function renderInsights(){
     if(pdpiCnt>=3)parts.push(buildRegiDetail(pdpiRows,'PDPI','ENDR',PDPI_ENDR));
     push(pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 → ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
   }
+  const mmrjRows=byFeat('MMRJ');
+  if(mmrjRows.length>=2){
+    push(mmrjRows.length>=5?'danger':'warn',`MM Reject 다수 → ${buildRegiDetail(mmrjRows,'MMRJ','RJCU',MMRJ_CAUSES)} — 네트워크 거부 사유 확인 필요`,'device');
+  }
   const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
   if(simdChg>0)push('info',`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`,'device');
 
