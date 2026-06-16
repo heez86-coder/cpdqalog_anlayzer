@@ -1593,12 +1593,13 @@ function prefetchTop3Neta(){
   getTop3Stations().forEach(s=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
+    const {dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
     fetchNetaStation(plmn,s.tac,s.pid,s.band||'',s.dch||'').then(result=>{
       // 확장 행이 이미 로딩 상태로 열려있으면 결과로 교체
       const expRow=document.querySelector(`[data-neta-exp="${CSS.escape(s.key)}"]`);
       if(expRow){
         if(expRow._ticker)clearInterval(expRow._ticker);
-        expRow.innerHTML=`<td colspan="15">${buildNetaPanel(result,plmn,s.tac,s.pid)}</td>`;
+        expRow.innerHTML=`<td colspan="15">${buildNetaPanel(result,plmn,s.tac,s.pid,dlch)}</td>`;
       }
     });
   });
@@ -1621,10 +1622,18 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   const validTrend=Array.isArray(trend)&&!trend._fetchErr?trend:null;
   const trendLatest=validTrend?.length?validTrend[validTrend.length-1]:null;
   const infoArr=Array.isArray(validInfo)?validInfo:(validInfo?[validInfo]:[]);
-  // 정확히 일치하는 (tac,pci) 만 사용 — infoArr[0] 폴백 금지 (다른 기지국 데이터 오노출 방지)
-  const matchedInfo=infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))||null;
-  // 이벤트 데이터 소스: trendLatest(최근 주차) 우선, 그다음 정확매칭 info
-  const eventSrc=trendLatest||matchedInfo;
+  // 이벤트 데이터용 엄격 매칭: TAC + PCI + DLCh (Band가 다르면 매칭 실패 → 이벤트 데이터 없음)
+  const strictMatch=infoArr.find(r=>
+    String(r.tac)===String(tacDec)&&
+    String(r.pci)===String(pci)&&
+    (dlch?String(r.dlch??'')===String(dlch):true)
+  )||null;
+  // 주소/위치용 느슨 매칭: TAC + PCI (Band 무관) — 같은 셀의 주소·좌표는 Band와 독립적
+  const looseMatch=infoArr.find(r=>
+    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)
+  )||null;
+  // 이벤트 데이터 소스: trendLatest(이미 PCI/DLCh 필터링) 우선, 그다음 strictMatch
+  const eventSrc=trendLatest||strictMatch;
   // 주소/위치는 업로드된 지역정보 CSV를 1순위로 사용
   const csvGeo=getStationGeo(tac,pci);
 
@@ -1634,13 +1643,13 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   const uid='np'+Date.now();
   const scoreColor=s=>s>=700?'#dc2626':s>=400?'#b45309':'#16a34a';
 
-  // ── 왼쪽 컬럼: 주소 + 소형 지도 (CSV 우선, NETA 정확매칭 정보 차순위)
+  // ── 왼쪽 컬럼: 주소 + 소형 지도 (CSV 우선, NETA loose 매칭 차순위 — Band 무관)
   let leftCol='<div class="neta-left-col">';
   let hasMap=false;
-  const region=csvGeo?.addr||matchedInfo?.region||'';
-  const cidVal=matchedInfo?.cid||eventSrc?.cid||'';
-  const lat=csvGeo?.lat??matchedInfo?.lat??null;
-  const lng=csvGeo?.lng??matchedInfo?.lng??null;
+  const region=csvGeo?.addr||looseMatch?.region||'';
+  const cidVal=looseMatch?.cid||'';
+  const lat=csvGeo?.lat??looseMatch?.lat??null;
+  const lng=csvGeo?.lng??looseMatch?.lng??null;
   if(region||lat!=null){
     const cidHtml=cidVal?`<span style="font-size:10px;color:#64748b;display:block">CID: ${esc(cidVal)}</span>`:'';
     const locSrc=lat!=null&&lng!=null?`<span style="font-size:10px;color:#94a3b8">${lat}, ${lng}</span>`:'';
@@ -1746,9 +1755,9 @@ async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   const expRow=document.createElement('tr');
   expRow.className='neta-expand-row';
   // 캐시 확인 — 있으면 바로 표시
-  const {cacheKey}=netaResolve(plmn,tac,pci,band,dch);
+  const {cacheKey,dlch}=netaResolve(plmn,tac,pci,band,dch);
   if(netaCache[cacheKey]?.data){
-    expRow.innerHTML=`<td colspan="15">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci)}</td>`;
+    expRow.innerHTML=`<td colspan="15">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci,dlch)}</td>`;
     tr.after(expRow);return;
   }
   const loadId='nl-'+Date.now();
@@ -1758,7 +1767,7 @@ async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
   const data=await fetchNetaStation(plmn,tac,pci,band,dch);
   clearInterval(expRow._ticker);
-  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci)}</td>`;
+  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,dlch)}</td>`;
 }
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
@@ -1857,10 +1866,10 @@ function renderStationTable(){
     expRow.setAttribute('data-neta-exp',s.key);
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
-    const {cacheKey}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
+    const {cacheKey,dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
     const cached=netaCache[cacheKey]?.data;
     if(cached){
-      expRow.innerHTML=`<td colspan="15">${buildNetaPanel(cached,plmn,s.tac,s.pid)}</td>`;
+      expRow.innerHTML=`<td colspan="15">${buildNetaPanel(cached,plmn,s.tac,s.pid,dlch)}</td>`;
     }else{
       let sec=0;
       const loadId='nl-'+Math.random().toString(36).slice(2);
