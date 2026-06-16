@@ -974,7 +974,7 @@ function renderInsights(){
     }
   }
   // RLF Cause 집중 분석 — Cause 0(Unknown) 또는 Cause 7(Handover Failure)
-  // 조건: HO Failure ≥ 3회 AND 해당 기지국 전체 RLF 중 HO Failure 비중 ≥ 70%
+  // 조건: HO Failure ≥ 5회 AND 해당 기지국 전체 RLF 중 HO Failure 비중 ≥ 70%
   {
     const HO_CAUSES=new Set(['0','7']);
     const causeStMap={};
@@ -990,7 +990,7 @@ function renderInsights(){
         causeStMap[k].cntByCode[cauVal]=(causeStMap[k].cntByCode[cauVal]||0)+1;
       }
     });
-    const hotStations=Object.values(causeStMap).filter(s=>s.hoCnt>=3&&s.hoCnt/s.total>=0.7);
+    const hotStations=Object.values(causeStMap).filter(s=>s.hoCnt>=5&&s.hoCnt/s.total>=0.7);
     if(hotStations.length>0){
       hotStations.sort((a,b)=>b.hoCnt-a.hoCnt);
       const top=hotStations[0];
