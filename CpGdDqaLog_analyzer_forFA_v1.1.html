@@ -1039,19 +1039,50 @@ function renderInsights(){
     const infoTxt=mipiWithInfo.length>0?` (MID/PID 오류 ${mipiWithInfo.length}건)`:'';
     push(mipiWithInfo.length>0?'warn':'info',`MIPI 오류 ${mipiRows2.length}건 발생${infoTxt} — 단말 하드웨어 점검 필요`,'device');
   }
-  const attiCnt=byFeat('ATTI').length,attfCnt=byFeat('ATTF').length;
-  const pdpiCnt=byFeat('PDPI').length,pdpfCnt=byFeat('PDPF').length;
+  const attiRows=byFeat('ATTI'),attfRows=byFeat('ATTF');
+  const pdpiRows=byFeat('PDPI'),pdpfRows=byFeat('PDPF');
+  const attiCnt=attiRows.length,attfCnt=attfRows.length;
+  const pdpiCnt=pdpiRows.length,pdpfCnt=pdpfRows.length;
+  // 망등록/데이터 접속 오류 상세 — 집중 일자 / TAC·PCI / Cause 코드 요약
+  const buildRegiDetail=(rows,label,causeField,causeMap)=>{
+    if(!rows.length)return `${label} ${rows.length}건`;
+    const dParts=[];
+    const dayCnt={};
+    rows.forEach(r=>{dayCnt[r.Date]=(dayCnt[r.Date]||0)+1;});
+    const sortedDay=Object.entries(dayCnt).sort((a,b)=>b[1]-a[1]);
+    if(sortedDay.length&&dates.length>1){
+      const [topD,topN]=sortedDay[0];
+      const [,mo,dy]=topD.split('-');
+      dParts.push(`${parseInt(mo)}/${parseInt(dy)}일에 ${topN}건 발생`);
+    }
+    const tacs=rows.map(r=>String(r.TAC_||'').trim()).filter(Boolean);
+    const topTac=topVal(tacs);
+    if(topTac){
+      const pciRows=rows.filter(r=>String(r.TAC_||'').trim()===topTac);
+      const topPci=topVal(pciRows.map(r=>String(r.PhID||'').trim()).filter(Boolean));
+      dParts.push('TAC '+tacToDecStr(topTac)+(topPci?', PCI '+topPci:''));
+    }
+    if(causeField){
+      const causes=rows.map(r=>String(r[causeField]||'').trim()).filter(v=>v&&v!=='0'&&v!=='255');
+      const topC=topVal(causes);
+      if(topC){
+        const desc=causeMap&&causeMap[topC];
+        dParts.push(`${causeField} ${topC}`+(desc?` : ${desc}`:''));
+      }
+    }
+    return `${label} ${rows.length}건`+(dParts.length?` (${dParts.join(', ')})`:'');
+  };
   if(attfCnt>=3||attiCnt>=3){
     const parts=[];
-    if(attfCnt>=3)parts.push(`ATTF ${attfCnt}건`);
-    if(attiCnt>=3)parts.push(`ATTI ${attiCnt}건`);
-    push(attfCnt>=5||attiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 — ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
+    if(attfCnt>=3)parts.push(buildRegiDetail(attfRows,'ATTF','EMMC',EMMC_CAUSES));
+    if(attiCnt>=3)parts.push(buildRegiDetail(attiRows,'ATTI','EMMC',EMMC_CAUSES));
+    push(attfCnt>=5||attiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 → ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
   }
   if(pdpfCnt>=3||pdpiCnt>=3){
     const parts=[];
-    if(pdpfCnt>=3)parts.push(`PDPF ${pdpfCnt}건`);
-    if(pdpiCnt>=3)parts.push(`PDPI ${pdpiCnt}건`);
-    push(pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 — ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
+    if(pdpfCnt>=3)parts.push(buildRegiDetail(pdpfRows,'PDPF','ENDR',PDPF_ENDR));
+    if(pdpiCnt>=3)parts.push(buildRegiDetail(pdpiRows,'PDPI','ENDR',PDPI_ENDR));
+    push(pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 → ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
   }
   const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
   if(simdChg>0)push('info',`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`,'device');
