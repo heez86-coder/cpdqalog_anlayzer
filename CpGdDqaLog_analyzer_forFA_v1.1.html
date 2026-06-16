@@ -839,19 +839,22 @@ function renderInsights(){
     if(dr>=10)push('danger',`전체 DROP률 ${dr.toFixed(1)}% — 심각 수준 (기준: 10% 초과)`,'drop');
     else if(dr>=5)push('warn',`전체 DROP률 ${dr.toFixed(1)}% — 주의 (기준: 5% 초과)`,'drop');
   }
+  // 정상/사용자 의도 종료성 cause는 자동 인사이트의 "주요 Cause" 표시에서 제외
+  const NORMAL_DROP_CAUSES=new Set(['200','487','603']);
   const topDropSt=stList.filter(s=>s.drops.length>0).sort((a,b)=>b.drops.length-a.drops.length)[0];
   if(topDropSt&&totalDrop>=3){
     const pct=Math.round(topDropSt.drops.length/totalDrop*100);
     if(pct>=50||pct>=30){
       const lv=pct>=50?'danger':'warn';
-      const rsrpTxt=topDropSt.avgRsrp!==null?` RSRP ${topDropSt.avgRsrp.toFixed(1)}dBm`:'';
-      const sinrTxt=topDropSt.avgSinr!==null?` SINR ${topDropSt.avgSinr.toFixed(1)}dB`:'';
-      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-      const causes=topDropSt.drops.map(r=>r.SIPR).filter(Boolean);
+      const sigParts=[];
+      if(topDropSt.avgRsrp!==null)sigParts.push(`RSRP ${topDropSt.avgRsrp.toFixed(1)}dBm`);
+      if(topDropSt.avgSinr!==null)sigParts.push(`SINR ${topDropSt.avgSinr.toFixed(1)}dB`);
+      const sigTxt=sigParts.length?` [전계: ${sigParts.join(' / ')}]`:'';
+      const causes=topDropSt.drops.map(r=>String(r.SIPR||'').trim()).filter(c=>c&&!NORMAL_DROP_CAUSES.has(c));
       const topC=topVal(causes);
       const causeTxt=topC?` / 주요 Cause: ${topC}${DROP_CAUSES[topC]?' ('+DROP_CAUSES[topC]+')':''}`:'';
       const suffix=pct>=50?' → 특정 기지국 문제 의심':'';
-      push(lv,`TAC ${tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid}에 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
+      push(lv,`특정 기지국 (TAC ${tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid})에서 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
     }
   }
   if(dates.length>1){
@@ -897,9 +900,10 @@ function renderInsights(){
     const muteRate=totalCend>0?(muteRows.length/totalCend*100).toFixed(1):'?';
     const rsrpVals=muteRows.map(r=>parseFloat(r.RSRP??'')).filter(v=>!isNaN(v));
     const sinrVals=muteRows.map(r=>parseFloat(r.CINR??r.SINR??'')).filter(v=>!isNaN(v));
-    const avgRsrpTxt=rsrpVals.length?` RSRP ${avgArr(rsrpVals).toFixed(1)}dBm`:'';
-    const avgSinrTxt=sinrVals.length?` SINR ${avgArr(sinrVals).toFixed(1)}dB`:'';
-    const sigTxt=(avgRsrpTxt||avgSinrTxt)?` [평균 전계:${avgRsrpTxt}${avgSinrTxt}]`:'';
+    const sigParts=[];
+    if(rsrpVals.length)sigParts.push(`RSRP ${avgArr(rsrpVals).toFixed(1)}dBm`);
+    if(sinrVals.length)sigParts.push(`SINR ${avgArr(sinrVals).toFixed(1)}dB`);
+    const sigTxt=sigParts.length?` [평균 전계: ${sigParts.join(' / ')}]`:'';
     const typeCnt={};
     SOUND_TYPES.forEach(t=>{const n=muteRows.filter(r=>r[t.key]==='1'||r[t.key]===1).length;if(n>0)typeCnt[t.key]=n;});
     const typeTotal=Object.values(typeCnt).reduce((s,n)=>s+n,0);
@@ -908,7 +912,7 @@ function renderInsights(){
       const [topT,topN]=Object.entries(typeCnt).sort((a,b)=>b[1]-a[1])[0];
       const pct=Math.round(topN/typeTotal*100);
       const lblM={RSMT:'RSMT (Short Mute)',RNMT:'RNMT (수신없음)',DBMT:'DBMT (DL BLER)',UBMT:'UBMT (UL BLER)'};
-      if(pct>=60)causeTxt=` — 주요 원인 ${pct}%: ${lblM[topT]||topT} (${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'})`;
+      if(pct>=60)causeTxt=` — 주요 유형 ${pct}%: ${lblM[topT]||topT} (${topT.startsWith('R')?'수신측 집중':'HighBLER 확인필요'})`;
     }
     push(parseFloat(muteRate)>=10?'warn':'info',`MUTE ${muteRows.length}건 (MUTE율 ${muteRate}%)${sigTxt}${causeTxt}`,'mute');
   }
@@ -917,10 +921,11 @@ function renderInsights(){
   if(topMuteSt&&topMuteSt.nonMicMutes.length>=2&&totalNonMicMute>=3){
     const pct=Math.round(topMuteSt.nonMicMutes.length/totalNonMicMute*100);
     if(pct>=40){
-      const rsrpTxt=topMuteSt.avgRsrp!==null?` RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`:'';
-      const sinrTxt=topMuteSt.avgSinr!==null?` SINR ${topMuteSt.avgSinr.toFixed(1)}dB`:'';
-      const sigTxt=(rsrpTxt||sinrTxt)?` [전계:${rsrpTxt}${sinrTxt}]`:'';
-      push('warn',`TAC ${tacToDecStr(topMuteSt.tac)} / PCI ${topMuteSt.pid}에 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`,'mute');
+      const sigParts=[];
+      if(topMuteSt.avgRsrp!==null)sigParts.push(`RSRP ${topMuteSt.avgRsrp.toFixed(1)}dBm`);
+      if(topMuteSt.avgSinr!==null)sigParts.push(`SINR ${topMuteSt.avgSinr.toFixed(1)}dB`);
+      const sigTxt=sigParts.length?` [전계: ${sigParts.join(' / ')}]`:'';
+      push('warn',`특정 기지국 (TAC ${tacToDecStr(topMuteSt.tac)} / PCI ${topMuteSt.pid})에서 MUTE의 ${pct}% 집중 (${topMuteSt.nonMicMutes.length}건)${sigTxt}`,'mute');
     }
   }
   const micMuteCnt=muteRows.filter(r=>['SAMS','MCST','SMBU'].some(k=>r[k]==='1'||parseInt(r[k]||0,10)>0)).length;
@@ -1945,7 +1950,7 @@ function getRawCause(r){
     return parts.join(', ');
   }
   if(f==='SCGF'){const v=String(r.Ftyp??'').trim();if(!v)return'';if(v==='N')return'N';return v+' : '+(SCGF_FTYP[v]||'Unknown');}
-  if(f==='PSCI'){if(r._suppressPsciCause)return '';const v=String(r.FLCD??'').trim();return v?(v+(FLCD_CAUSES[v]?` : ${FLCD_CAUSES[v]}`:'')):''}
+  if(f==='PSCI'){if(r._suppressPsciCause)return '';const v=String(r.FLCD??'').trim();if(!v||v==='200'||v==='210')return '';return v+(FLCD_CAUSES[v]?` : ${FLCD_CAUSES[v]}`:'')}
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPF_ENDR[v]||'')):''}
   if(f==='PDPI'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPI_ENDR[v]||'')):''};
