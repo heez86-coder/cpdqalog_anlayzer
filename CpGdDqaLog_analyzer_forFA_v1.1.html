@@ -1941,7 +1941,7 @@ function getRawCause(r){
     return parts.join(', ');
   }
   if(f==='SCGF'){const v=String(r.Ftyp??'').trim();if(!v)return'';if(v==='N')return'N';return v+' : '+(SCGF_FTYP[v]||'Unknown');}
-  if(f==='PSCI'){const v=String(r.FLCD??'').trim();return v?(v+(FLCD_CAUSES[v]?` : ${FLCD_CAUSES[v]}`:'')):''}
+  if(f==='PSCI'){if(r._suppressPsciCause)return '';const v=String(r.FLCD??'').trim();return v?(v+(FLCD_CAUSES[v]?` : ${FLCD_CAUSES[v]}`:'')):''}
   if(f==='REGI'){const v=String(r.FRSN??'').trim();return v?`${v} : ${REGI_CAUSES[v]||''}`:''}
   if(f==='PDPF'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPF_ENDR[v]||'')):''}
   if(f==='PDPI'){const v=String(r.ENDR??'').trim();return v?(v+' : '+(PDPI_ENDR[v]||'')):''};
@@ -1972,7 +1972,7 @@ function buildRawRows(){
     r._sec=isNaN(t.getTime())?0:Math.floor(t.getTime()/1000);
     return r._sec;
   };
-  rows.forEach(r=>{r._grpKey=null;toSec(r);});
+  rows.forEach(r=>{r._grpKey=null;r._suppressPsciCause=false;toSec(r);});
   // Step 1: CEND+CTIM 기반 통화 윈도우
   let gid=0;
   const rawWins=[];
@@ -2032,6 +2032,15 @@ function buildRawRows(){
     if(!r._grpKey&&(r.Feature==='CEND'||r.Feature==='DROP')){
       r._grpKey='grp'+(gid++);
     }
+  });
+  // PSCI Cause 중복 표시 방지: DROP이 Cause를 갖고 같은 그룹에 있으면 PSCI Cause 숨김
+  // (PSCI.FLCD와 DROP.SIPR이 동일 코드(예: 1115)로 매핑돼 텍스트가 겹치는 케이스)
+  const dropGrpsWithCause=new Set();
+  rows.forEach(r=>{
+    if(r.Feature==='DROP'&&r._grpKey&&String(r.SIPR||'').trim())dropGrpsWithCause.add(r._grpKey);
+  });
+  rows.forEach(r=>{
+    if(r.Feature==='PSCI'&&r._grpKey&&dropGrpsWithCause.has(r._grpKey))r._suppressPsciCause=true;
   });
   return rows;
 }
