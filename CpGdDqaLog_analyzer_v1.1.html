@@ -2058,14 +2058,14 @@ function buildRawRows(){
       r._grpKey='grp'+(gid++);
     }
   });
-  // PSCI Cause 중복 표시 방지: DROP이 Cause를 갖고 같은 그룹에 있으면 PSCI Cause 숨김
-  // (PSCI.FLCD와 DROP.SIPR이 동일 코드(예: 1115)로 매핑돼 텍스트가 겹치는 케이스)
-  const dropGrpsWithCause=new Set();
+  // PSCI Cause 표시 정책: 같은 통화 그룹에 DROP이 있으면 Cause는 DROP만 노출
+  // (PSCI.FLCD와 DROP.SIPR이 동일 코드로 매핑돼 중복으로 보이던 문제 해소)
+  const dropGrps=new Set();
   rows.forEach(r=>{
-    if(r.Feature==='DROP'&&r._grpKey&&String(r.SIPR||'').trim())dropGrpsWithCause.add(r._grpKey);
+    if(r.Feature==='DROP'&&r._grpKey)dropGrps.add(r._grpKey);
   });
   rows.forEach(r=>{
-    if(r.Feature==='PSCI'&&r._grpKey&&dropGrpsWithCause.has(r._grpKey))r._suppressPsciCause=true;
+    if(r.Feature==='PSCI'&&r._grpKey&&dropGrps.has(r._grpKey))r._suppressPsciCause=true;
   });
   return rows;
 }
