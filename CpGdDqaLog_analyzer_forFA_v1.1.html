@@ -878,9 +878,22 @@ function renderInsights(){
       const sigTxt=sigParts.length?` [전계: ${sigParts.join(' / ')}]`:'';
       const causes=topDropSt.drops.map(r=>String(r.SIPR||'').trim()).filter(c=>c&&!NORMAL_DROP_CAUSES.has(c));
       const topC=topVal(causes);
-      const causeTxt=topC?` / 주요 Cause: ${topC}${DROP_CAUSES[topC]?' ('+DROP_CAUSES[topC]+')':''}`:'';
+      const causeTxt=topC?` / 주요 Cause: ${topC} (${DROP_CAUSES[topC]||'Unknown'})`:'';
       const suffix=pct>=50?' → 특정 기지국 문제 의심':'';
-      push(lv,`특정 기지국 (TAC ${tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid})에서 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
+      // 3G 판정: 해당 기지국의 DROP 중 ACT='2' 비중 50% 이상이면 3G로 간주 → TAC 대신 LAC 노출
+      const drops3GCnt=topDropSt.drops.filter(r=>String(r.ACT_??r.ACT??'').trim()==='2').length;
+      const is3G=topDropSt.drops.length>0&&(drops3GCnt/topDropSt.drops.length)>=0.5;
+      let stHeader,stLine;
+      if(is3G){
+        const lacRow=topDropSt.drops.find(r=>String(r.LAC_??r.LAC??'').trim()!=='');
+        const lacVal=lacRow?String(lacRow.LAC_??lacRow.LAC??'').trim():'';
+        stHeader='3G 기지국';
+        stLine=`LAC ${lacVal||tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid}`;
+      }else{
+        stHeader='기지국';
+        stLine=`TAC ${tacToDecStr(topDropSt.tac)} / PCI ${topDropSt.pid}`;
+      }
+      push(lv,`특정 ${stHeader} (${stLine})에서 DROP의 ${pct}% 집중${suffix}${sigTxt}${causeTxt}`,'drop');
     }
   }
   if(dates.length>1){
