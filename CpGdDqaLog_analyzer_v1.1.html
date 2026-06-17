@@ -1050,10 +1050,14 @@ function renderInsights(){
     }
     push(scgfRows.length>=7?'danger':'warn',`[SCGF] SCG Failure ${scgfRows.length}건 발생${causeStr}${scgfStTxt}`,'radio');
   }
-  const allRsrp=stList.filter(s=>s.avgRsrp!==null).map(s=>s.avgRsrp);
-  const allSinr=stList.filter(s=>s.avgSinr!==null).map(s=>s.avgSinr);
-  if(allRsrp.length){const v=parseFloat(avgArr(allRsrp).toFixed(1));if(v<=-105)push('danger',`[RLF] 전계 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');else if(v<=-100)push('warn',`[RLF] 전계 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');}
-  if(allSinr.length){const v=parseFloat(avgArr(allSinr).toFixed(1));if(v<-3)push('warn',`[RLF] 전계 평균 SINR ${v} dB — 셀 간섭 또는 신호 열화 지속`,'radio');}
+  // RLF 데이터는 RxP0(RSRP)만 있고 SINR 항목은 없음 → RLF 이벤트 RSRP만 분석
+  // (기존 코드는 stList의 avgRsrp/avgSinr를 사용해 DROP/MUTE SINR가 [RLF]로 잘못 라벨링됨)
+  const rlfRsrpVals=allRlfEvents.map(e=>fNum(e.RxP0)).filter(v=>v!==null);
+  if(rlfRsrpVals.length){
+    const v=parseFloat(avgArr(rlfRsrpVals).toFixed(1));
+    if(v<=-105)push('danger',`[RLF] 평균 RSRP ${v} dBm — 극심한 약전계 구간 포함`,'radio');
+    else if(v<=-100)push('warn',`[RLF] 평균 RSRP ${v} dBm — 약전계 구간 다수`,'radio');
+  }
 
   // ── 단말 / 망 이슈 ────────────────────────────────────
   const crshRows=byFeat('CRSH');
