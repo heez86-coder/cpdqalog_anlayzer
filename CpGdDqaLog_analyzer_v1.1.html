@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
 <style>
 :root{
@@ -251,9 +254,9 @@ tr.neta-clickable.expanded td:first-child::after{content:' ▴';color:#2980b9}
 @media print{
   /* 배경·색상 항상 인쇄 (Chrome 인쇄 대화상자에서 '배경 그래픽' 체크 필요) */
   *,*::before,*::after{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important}
-  /* 한국어 폰트 폴백 보강 — Pretendard CDN이 PDF에 embedded 안 돼도 시스템 한글 폰트로 표시 */
+  /* 한국어 폰트 폴백 — Noto Sans KR(Google Fonts)을 최우선, 그다음 시스템 한글 폰트로 폴백 */
   html,body,table,th,td,div,span,p,h1,h2,h3,h4,h5,a,button,input,select,textarea,label{
-    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕","Noto Sans KR","NotoSansKR",sans-serif !important;
+    font-family:"Noto Sans KR","NotoSansKR","Pretendard","Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",sans-serif !important;
   }
   /* 페이지 설정 — A4 세로, 적당한 여백 */
   @page{size:A4 portrait;margin:10mm 8mm}
