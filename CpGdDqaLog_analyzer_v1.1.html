@@ -1553,7 +1553,7 @@ function renderDropTab(){
       const sinrStyle=sinrV!==null&&sinrV<0?'font-weight:600;color:var(--orange)':'';
       return'<tr'+(adRow?' style="background:#fff8f8"':'')+'>'
         +'<td>'+r.Time+'</td><td>'+plmnFmt(r.PLMN)+'</td>'
-        +'<td>'+(r.TAC_??'')+'</td><td>'+(isNaN(tacDec)?'':tacDec)+'</td>'
+        +'<td>'+(isNaN(tacDec)?'':tacDec)+'</td>'
         +'<td>'+(r.PhID??'')+'</td><td>'+(r.DLCh??'')+'</td>'
         +'<td style="font-size:11px;'+rsrpStyle+'">'+rsrpTxt+'</td>'
         +'<td style="font-size:11px;'+sinrStyle+'">'+sinrTxt+'</td>'
@@ -1567,7 +1567,7 @@ function renderDropTab(){
       +rsrpSpan+sinrSpan+blerSpan2+adSpan+'</div>'
       +'<div style="overflow-x:auto"><table>'
       +'<thead><tr><th style="width:72px">Time</th><th style="width:110px">PLMN</th>'
-      +'<th style="width:72px">TAC(HEX)</th><th style="width:72px">TAC(DEC)</th>'
+      +'<th style="width:72px">TAC</th>'
       +'<th style="width:52px">PCI</th><th style="width:60px">DLCh</th>'
       +'<th style="width:54px">RSRP</th><th style="width:54px">SINR</th>'
       +'<th style="width:160px">Cause (SIPR)</th><th style="width:70px"></th>'
@@ -1668,7 +1668,7 @@ function prefetchTop3Neta(){
       const expRow=document.querySelector(`[data-neta-exp="${CSS.escape(s.key)}"]`);
       if(expRow){
         if(expRow._ticker)clearInterval(expRow._ticker);
-        expRow.innerHTML=`<td colspan="15">${buildNetaPanel(result,plmn,s.tac,s.pid,dlch)}</td>`;
+        expRow.innerHTML=`<td colspan="14">${buildNetaPanel(result,plmn,s.tac,s.pid,dlch)}</td>`;
       }
     });
   });
@@ -1800,7 +1800,7 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   return`<div class="neta-panel">${leftCol}${rightCol}</div>`;
 }
 
-const ST_COL_HDRS=['#','상태','PLMN','ACT','TAC\n(HEX)','TAC\n(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
+const ST_COL_HDRS=['#','상태','PLMN','ACT','TAC','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
 function insertStColHeader(tr){
   const prev=tr.previousElementSibling;
   if(prev&&prev.classList.contains('st-col-header-row'))return;
@@ -1826,17 +1826,17 @@ async function toggleNetaRow(tr,plmn,tac,pci,band,dch){
   // 캐시 확인 — 있으면 바로 표시
   const {cacheKey,dlch}=netaResolve(plmn,tac,pci,band,dch);
   if(netaCache[cacheKey]?.data){
-    expRow.innerHTML=`<td colspan="15">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci,dlch)}</td>`;
+    expRow.innerHTML=`<td colspan="14">${buildNetaPanel(netaCache[cacheKey].data,plmn,tac,pci,dlch)}</td>`;
     tr.after(expRow);return;
   }
   const loadId='nl-'+Date.now();
-  expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초</div></td>`;
+  expRow.innerHTML=`<td colspan="14"><div class="neta-loading">⏳ NETA 기지국 정보 조회 중… <span id="${loadId}">0</span>초</div></td>`;
   tr.after(expRow);
   let sec=0;
   expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
   const data=await fetchNetaStation(plmn,tac,pci,band,dch);
   clearInterval(expRow._ticker);
-  expRow.innerHTML=`<td colspan="15">${buildNetaPanel(data,plmn,tac,pci,dlch)}</td>`;
+  expRow.innerHTML=`<td colspan="14">${buildNetaPanel(data,plmn,tac,pci,dlch)}</td>`;
 }
 function renderStationTable(){
   const qTac=(document.getElementById('stTac').value||'').toLowerCase();
@@ -1875,15 +1875,14 @@ function renderStationTable(){
     '<tr>'
     +'<th rowspan="2" style="width:32px;min-width:32px;background:var(--blue-800)">#</th>'
     +'<th rowspan="2" style="width:62px;min-width:62px;background:var(--blue-800)">상태</th>'
-    +grpTh('기지국 정보',6,G1)
+    +grpTh('기지국 정보',5,G1)
     +grpTh('발생 이벤트',4,G2)
     +grpTh('전계 정보(평균)',3,G3)
     +'</tr>'
     +'<tr>'
     +`<th style="width:86px;min-width:86px;background:${G1s}">PLMN</th>`
     +`<th style="width:56px;min-width:56px;background:${G1s}">ACT</th>`
-    +`<th style="width:72px;min-width:72px;background:${G1s}">TAC(HEX)</th>`
-    +`<th style="width:72px;min-width:72px;background:${G1s}">TAC(DEC)</th>`
+    +`<th style="width:80px;min-width:80px;background:${G1s}">TAC</th>`
     +`<th style="width:52px;min-width:52px;background:${G1s}">PCI</th>`
     +`<th style="width:56px;min-width:56px;background:${G1s}">Band</th>`
     +thW('cend','CEND',52,G2s)+thW('drop','DROP',52,G2s)+thW('mute','MUTE',52,G2s)+thW('rlfi','RLF',52,G2s)
@@ -1912,7 +1911,7 @@ function renderStationTable(){
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
       <td>${plmnDisp}</td><td>${actDisp}</td>
-      <td>${s.tac}</td><td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
+      <td>${isNaN(tacDec)?'':tacDec}</td><td>${s.pid}</td><td>${s.band||s.dch}</td>
       <td>${s.cends.length}</td>
       <td style="color:${s.drops.length>0?'#c0392b':'inherit'}">${dropCell}</td>
       <td style="color:${s.nonMicMutes.length>0?'#b7640a':'inherit'}" data-tip="${muteTip}">${s.nonMicMutes.length}</td>
@@ -1921,7 +1920,7 @@ function renderStationTable(){
       <td style="color:${sinrBad?'#c0392b':'inherit'};font-weight:${sinrBad?700:400}">${s.avgSinr!==null?s.avgSinr:'-'}</td>
       <td style="color:${s.avgBler!==null&&s.avgBler>=40?'#b7640a':'inherit'};font-weight:${s.avgBler!==null&&s.avgBler>=40?700:400}">${s.avgBler!==null?s.avgBler:'-'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="15" class="no-data">해당 기지국이 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="14" class="no-data">해당 기지국이 없습니다.</td></tr>';
   document.getElementById('stCount').textContent=`총 ${all.length}개 기지국`;
   // 상위 3개 기지국 자동 확장
   all.slice(0,3).forEach(s=>{
@@ -1937,11 +1936,11 @@ function renderStationTable(){
     const {cacheKey,dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
     const cached=netaCache[cacheKey]?.data;
     if(cached){
-      expRow.innerHTML=`<td colspan="15">${buildNetaPanel(cached,plmn,s.tac,s.pid,dlch)}</td>`;
+      expRow.innerHTML=`<td colspan="14">${buildNetaPanel(cached,plmn,s.tac,s.pid,dlch)}</td>`;
     }else{
       let sec=0;
       const loadId='nl-'+Math.random().toString(36).slice(2);
-      expRow.innerHTML=`<td colspan="15"><div class="neta-loading">⏳ NETA 조회 중… <span id="${loadId}">0</span>초</div></td>`;
+      expRow.innerHTML=`<td colspan="14"><div class="neta-loading">⏳ NETA 조회 중… <span id="${loadId}">0</span>초</div></td>`;
       expRow._ticker=setInterval(()=>{const el=document.getElementById(loadId);if(el)el.textContent=++sec;else clearInterval(expRow._ticker);},1000);
     }
     tr.after(expRow);
@@ -2301,8 +2300,8 @@ function getRawNote(r){
   if(String(r.ACT_??'').trim()==='2')notes.push('3G확인필요');
   return notes.join(' · ');
 }
-const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC(HEX)','TAC(DEC)','PhID','Band(DLCh)','RSRP','SINR','BLER','Cause','참고'];
-const RAW_COL_W={'Date':92,'Time':76,'Feature':56,'PLMN':88,'ACT':64,'TAC(HEX)':64,'TAC(DEC)':64,'PhID':44,'Band(DLCh)':78,'RSRP':52,'SINR':50,'BLER':48,'Cause':145,'참고':185};
+const RAW_FIXED=['Date','Time','Feature','PLMN','ACT','TAC','PhID','Band(DLCh)','RSRP','SINR','BLER','Cause','참고'];
+const RAW_COL_W={'Date':92,'Time':76,'Feature':56,'PLMN':88,'ACT':64,'TAC':72,'PhID':44,'Band(DLCh)':78,'RSRP':52,'SINR':50,'BLER':48,'Cause':145,'참고':185};
 const SKIP_KEYS=new Set(['Date','Time','Feature']);
 let rawOpenIdx=new Set();
 function toggleDetail(globalIdx){
@@ -2341,8 +2340,7 @@ function renderRaw(){
       if(c==='Feature'){const col=FC[v]||{bg:'#f5f5f5',tc:'#555'};const tip=FEAT_DESC[v]||'';return'<td style="text-align:center;font-size:0"><span class="badge feat-tip" style="font-size:11px;background:'+col.bg+';color:'+col.tc+'"'+(tip?' data-tip="'+tip+'"':'')+'>'+v+'</span></td>';}
       if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return'<td style="text-align:center">'+(raw?raw+(op?'('+op+')':''):'' )+'</td>';}
       if(c==='ACT'){const v2=String(r.ACT_??r.ACT??'').trim();const lbl=ACT_MAP[v2];return'<td style="text-align:center">'+(v2?(lbl?v2+'('+lbl+')':v2):'')+'</td>';}
-      if(c==='TAC(HEX)')return'<td style="text-align:center">'+(r.TAC_??'')+'</td>';
-      if(c==='TAC(DEC)'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return'<td style="text-align:center">'+(isNaN(d)?'':d)+'</td>';}
+      if(c==='TAC'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return'<td style="text-align:center">'+(isNaN(d)?'':d)+'</td>';}
       if(c==='Band(DLCh)')return'<td style="text-align:center">'+getRawBandDLCh(r)+'</td>';
       if(c==='RSRP')return'<td style="text-align:center">'+getRawRSRP(r)+'</td>';
       if(c==='SINR')return'<td style="text-align:center">'+getRawSINR(r)+'</td>';
@@ -2401,8 +2399,7 @@ const ACT_MAP_DISP={'2':'3G','4':'LTE','6':'NR'};
 function cellText(r,c){
   if(c==='PLMN'){const raw=(r.PLMN||'').replace(/[^0-9]/g,'');const op=PLMN_OP[raw]||'';return raw?(raw+(op?'('+op+')':'')):''}
   if(c==='ACT'){const v=String(r.ACT_??r.ACT??'').trim();const lbl=ACT_MAP_DISP[v];return v?(lbl?v+'('+lbl+')':v):''}
-  if(c==='TAC(HEX)')return String(r.TAC_??'');
-  if(c==='TAC(DEC)'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return isNaN(d)?'':String(d);}
+  if(c==='TAC'){const h=String(r.TAC_??'').trim();const d=h?parseInt(h,16):NaN;return isNaN(d)?'':String(d);}
   if(c==='Band(DLCh)')return getRawBandDLCh(r);
   if(c==='RSRP')return String(getRawRSRP(r));
   if(c==='SINR')return String(getRawSINR(r));
@@ -2476,7 +2473,7 @@ function exportStationTable(mode){
   if(!all.length){alert('기지국 데이터가 없습니다.');return;}
   const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
-  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
+  const hdrs=['순위','상태','PLMN','ACT','TAC','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
   const rows=all.map((s,i)=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
@@ -2484,7 +2481,7 @@ function exportStationTable(mode){
     const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
     const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
-    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-'];
+    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null&&s.avgRsrp!==undefined?String(s.avgRsrp):'-',s.avgSinr!==null&&s.avgSinr!==undefined?String(s.avgSinr):'-',s.avgBler!==null&&s.avgBler!==undefined?String(s.avgBler):'-'];
   });
   if(mode==='csv'){
     const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
@@ -2513,7 +2510,7 @@ function exportTop3Stations(mode){
   if(!top3.length){alert('기지국 데이터가 없습니다.');return;}
   const ACT_MAP_ST={'2':'3G','4':'LTE','6':'NR'};
   const lbl={issue:'이슈집중',weak_sig:'신호세기미약',inter:'셀중첩간섭',high_bler:'HighBLER',normal:'양호'};
-  const hdrs=['순위','상태','PLMN','ACT','TAC(HEX)','TAC(DEC)','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
+  const hdrs=['순위','상태','PLMN','ACT','TAC','PCI','Band','CEND','DROP','MUTE','RLF','RSRP','SINR','BLER'];
   const rows=top3.map((s,i)=>{
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmnRaw=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
@@ -2521,7 +2518,7 @@ function exportTop3Stations(mode){
     const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
     const actDisp=ACT_MAP_ST[actRaw]||actRaw||'';
     const tacDec=s.tac?parseInt(s.tac,16):NaN;
-    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,s.tac,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null?String(s.avgRsrp):'-',s.avgSinr!==null?String(s.avgSinr):'-',s.avgBler!==null?String(s.avgBler):'-'];
+    return[String(i+1),lbl[s.level]||s.level,plmnDisp,actDisp,isNaN(tacDec)?'':String(tacDec),s.pid,s.band||s.dch,String(s.cends.length),String(s.drops.length),String(s.nonMicMutes.length),String(s.rlfis.length),s.avgRsrp!==null?String(s.avgRsrp):'-',s.avgSinr!==null?String(s.avgSinr):'-',s.avgBler!==null?String(s.avgBler):'-'];
   });
   if(mode==='csv'){
     const esc=v=>`"${String(v).replace(/"/g,'""')}"`;
