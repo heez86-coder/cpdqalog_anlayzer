@@ -1678,8 +1678,15 @@ function getISOWeek(d=new Date()){
   const w1Mon=new Date(jan4);w1Mon.setDate(jan4.getDate()-((jan4.getDay()||7)-1));
   return Math.floor((d-w1Mon)/(7*864e5))+1;
 }
+// NETA는 LTE(4G) 기지국 데이터만 제공 — 3G(ACT=2) / NR(ACT=6) 기지국은 NETA 조회 스킵
+function isNetaSupportedStation(s){
+  const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+  const actRaw=allR.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
+  return actRaw!=='2'&&actRaw!=='6'; // LTE(4)만 허용, 빈 값은 일단 허용
+}
 function prefetchTop3Neta(){
   getTop3Stations().forEach(s=>{
+    if(!isNetaSupportedStation(s))return; // 3G/NR 스킵
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
     const {dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
@@ -1925,9 +1932,11 @@ function renderStationTable(){
     const muteTipParts=['RSMT','RNMT','DBMT','UBMT'].map(k=>{const n=s.mutes.filter(r=>r[k]==='1'||r[k]===1).length;return n>0?k+' '+n+'건':null;}).filter(Boolean);
     const muteTip=muteTipParts.join(', ');
     const isTop3=i<3;
-    const netaOnclick=isTop3?`toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}');selectStationRow(${i})`:`selectStationRow(${i})`;
-    const netaCls=isTop3?' class="neta-clickable"':'';
-    const netaKey=isTop3?` data-neta-key="${s.key}"`:'';
+    // NETA는 LTE만 지원 → 3G(ACT=2) / NR(ACT=6)은 클릭 확장도 비활성화
+    const netaEligible=isTop3&&actRaw!=='2'&&actRaw!=='6';
+    const netaOnclick=netaEligible?`toggleNetaRow(this,'${plmnRaw}','${s.tac}','${s.pid}','${s.band||''}','${s.dch||''}');selectStationRow(${i})`:`selectStationRow(${i})`;
+    const netaCls=netaEligible?' class="neta-clickable"':'';
+    const netaKey=netaEligible?` data-neta-key="${s.key}"`:'';
     return`<tr id="st-row-${i}"${netaCls}${netaKey} onclick="${netaOnclick}" style="cursor:pointer">
       <td><span class="rank-badge ${rkCls}">${rk}</span></td>
       <td><span class="badge ${lc[s.level]}">${lbl[s.level]}</span></td>
