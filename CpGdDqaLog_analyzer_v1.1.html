@@ -670,6 +670,8 @@ function byFeat(f,rows){return(rows||allRows).filter(r=>r.Feature===f);}
 function cnt(f,rows){return byFeat(f,rows).length;}
 function pct(n,d){return d===0?'0.0':((n/d)*100).toFixed(1);}
 function fNum(v){const n=parseFloat(v);return isNaN(n)?null:n;}
+// SINR 전용 파서 — 단말 정상 범위(±40 dB) 밖의 값(예: 255, -127 sentinel)은 null 반환
+function fSinr(v){const n=parseFloat(v);return(isNaN(n)||Math.abs(n)>=40)?null:n;}
 function avgArr(arr){return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null;}
 // 게이지 바 색상 — 퍼센티지 구간별로 빨강→주황→노랑→파랑→회색
 function pctColor(p){if(p>=50)return '#dc2626';if(p>=30)return '#f97316';if(p>=15)return '#eab308';if(p>=5)return '#3b82f6';return '#94a3b8';}
@@ -737,7 +739,7 @@ function buildStationMap(){
         const isMicOnly=['SAMS','MCST','SMBU','TXSF'].some(k=>parseInt(r[k]||0,10)>0||r[k]==='1'||r[k]===1);
         const hasSoundMute=SOUND_TYPES.some(t=>r[t.key]==='1'||r[t.key]===1);
         if(hasSoundMute||!isMicOnly)s.nonMicMutes.push(r);
-        const rsrp=fNum(r.RSRP),sinr=fNum(r.CINR),bler=fNum(r.BLER);
+        const rsrp=fNum(r.RSRP),sinr=fSinr(r.CINR),bler=fNum(r.BLER);
         if(rsrp!==null)s.muteRsrp.push(rsrp);if(sinr!==null)s.muteSinr.push(sinr);if(bler!==null&&bler>0)s.muteBler.push(bler);
       }
     }
@@ -1417,7 +1419,7 @@ function renderMuteTab(){
   const rxRows=muteRows.filter(r=>rxTypes.some(t=>isOne(r[t.key])));
   const txRows=muteRows.filter(r=>txTypes.some(t=>isOne(r[t.key])));
   const muteRsrps=muteRows.map(r=>fNum(r.RSRP)).filter(v=>v!==null);
-  const muteSinrs=muteRows.map(r=>fNum(r.CINR)).filter(v=>v!==null);
+  const muteSinrs=muteRows.map(r=>fSinr(r.CINR)).filter(v=>v!==null);
   const muteBlers=muteRows.map(r=>fNum(r.BLER)).filter(v=>v!==null&&v>0);
   const avgMuteRsrp=muteRsrps.length?avgArr(muteRsrps).toFixed(1):null;
   const avgMuteSinr=muteSinrs.length?avgArr(muteSinrs).toFixed(1):null;
@@ -2156,13 +2158,13 @@ function filterRaw(){
 const FC={CEND:{bg:'#e8f4fd',tc:'#1a6fa0'},DROP:{bg:'#fdecea',tc:'#c0392b'},MUTE:{bg:'#fef3e2',tc:'#b7640a'},RLFC:{bg:'#eafaf1',tc:'#1e8449'},RLFI:{bg:'#eafaf1',tc:'#1e8449'},RLF:{bg:'#eafaf1',tc:'#1e8449'},CRSH:{bg:'#fdecea',tc:'#c0392b'},SIMD:{bg:'#f4ecfd',tc:'#6c3483'},DAST:{bg:'#fef3e2',tc:'#b7640a'},ATTI:{bg:'#fdecea',tc:'#922b21'},ATTF:{bg:'#fdecea',tc:'#922b21'},MMRJ:{bg:'#fdf2f8',tc:'#8e44ad'}};
 const FEAT_DESC={ATTF:'LTE ATTACH 실패 시',ATTI:'LTE ATTACH 내부 오류 실패 시',ATTS:'LTE ATTACH 성공',CEND:'CALL END EVENT',CRSH:'CP CRASH 발생 시',DAST:'Data Stall 발생 시',DROP:'CALLDROP EVENT',ENST:'ENDC 상태 정보 (24시간마다 1회전송)',INTG:'CP 부팅 시',MIPI:'MIPI 오류',MLPM:'발열제어동작 Trigger/Release',MMRJ:'MM 수행 중 Reject 수신',MUTE:'CALL MUTE EVENT',NSVC:'단말 No SVC / Limited SVC 발생정보 (24시간 동안)',PDPF:'PDP 발신 실패 시',PDPI:'PDP 내부 에러 실패 시',PDPS:'PDP 발생 성공',RFPD:'PAM 문제로 인한 Tx Power 이슈 검출',RLFC:'RLF 및 RRC DCH count (24시간마다)',RLF:'RLF 발생정보 (RLFI Feature 이벤트 개별 적용)',SCGF:'SCG Failure 발생정보',SCGC:'SCG Add, Trial 카운트 (24시간마다)',SIMD:'SIM Detect, No SIM 이벤트 발생정보 (24시간 마다)',SMSI:'SMS 발신 내부오류 실패 시',SMSS:'SMS 발신 성공시',SMSF:'SMS 발신 실패 시',TFEI:'Timing Error / Frequency Error / XO Error 발생 시',UCOF:'UE Capa Info packet overflow 발생',TXDH:'Tx Device Hopping 시간 (24시간 기준)',UCSI:'LTE UE Capa Size로 인한 문제 발생',PSCI:'PS Call 종료시 통화관련 정보',REGI:'Registration Event',NRHT:'발열로 인한 LTE Fallback 이벤트',REST:'단말 재시작 이벤트'};
 function getDropRSRP(r){const a=fNum(r.RxP0),b=fNum(r.RxP1);return a!==null&&b!==null?(a+b)/2:a;}
-function getDropSINR(r){const a=fNum(r.SNR0),b=fNum(r.SNR1);return a!==null&&b!==null?(a+b)/2:a;}
+function getDropSINR(r){const a=fSinr(r.SNR0),b=fSinr(r.SNR1);if(a!==null&&b!==null)return(a+b)/2;if(a!==null)return a;return b;}
 function getRawRSRP(r){
   if(r.Feature==='DROP'){const v=getDropRSRP(r);return v!==null?v.toFixed(1):'';}
   if(r.Feature==='RLF')return r.RxP0??'';
   return r.RSRP??'';
 }
-function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}return r.CINR??'';}
+function getRawSINR(r){if(r.Feature==='DROP'){const v=getDropSINR(r);return v!==null?v.toFixed(1):'';}const v=fSinr(r.CINR??r.SINR??'');return v!==null?String(v):'';}
 function getRawBLER(r){const v=fNum(r.BLER??'');return v!==null&&v>0?String(v):'';}
 
 function getRawCause(r){
