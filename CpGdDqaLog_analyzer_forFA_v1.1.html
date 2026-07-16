@@ -1698,12 +1698,12 @@ function prefetchTop3Neta(){
       const expRow=document.querySelector(`[data-neta-exp="${CSS.escape(s.key)}"]`);
       if(expRow){
         if(expRow._ticker)clearInterval(expRow._ticker);
-        expRow.innerHTML=`<td colspan="14">${buildNetaPanel(result,plmn,s.tac,s.pid,dlch)}</td>`;
+        expRow.innerHTML=`<td colspan="14">${buildNetaPanel(result,plmn,s.tac,s.pid,dlch,s.band)}</td>`;
       }
     });
   });
 }
-function buildNetaPanel(result,plmn,tac,pci,dlch){
+function buildNetaPanel(result,plmn,tac,pci,dlch,band){
   if(!result)return`<div class="neta-offline">⚠ NETA 응답 없음</div>`;
   const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const {info,trend,_urlInfo,_urlTrend}=result;
@@ -1722,6 +1722,15 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   const trendLatest=validTrend?.length?validTrend[validTrend.length-1]:null;
   const infoArr=Array.isArray(validInfo)?validInfo:(validInfo?[validInfo]:[]);
 
+  // Band별 DLCh 범위 정의 (여유 범위로 같은 Band의 모든 DLCh 포함)
+  const BAND_DLCH_RANGE={
+    '1':{min:0,max:600},
+    '3':{min:1200,max:1600},
+    '5':{min:2300,max:2700},
+    '7':{min:2750,max:3050},
+    '8':{min:3650,max:3900}
+  };
+
   // 정수형 변환을 통한 안전한 DLCh 대조 함수
   const matchDlch = (a, b) => {
     if (!a || !b) return true;
@@ -1733,15 +1742,24 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     return numA === numB;
   };
 
+  // Band 범위 필터 (같은 Band의 모든 DLCh 허용)
+  const isInBandRange = (testDlch, reqBand) => {
+    if (!reqBand || !testDlch) return true;
+    const range = BAND_DLCH_RANGE[String(reqBand)];
+    if (!range) return true; // 범위 미정의 Band는 신뢰
+    const numDlch = parseInt(String(testDlch).trim(), 10);
+    return !isNaN(numDlch) && numDlch >= range.min && numDlch <= range.max;
+  };
+
   // 이벤트 데이터용 엄격 매칭: TAC + PCI + DLCh (Band가 다르면 매칭 실패 → 이벤트 데이터 없음)
   const strictMatch=infoArr.find(r=>
     String(r.tac)===String(tacDec)&&
     String(r.pci)===String(pci)&&
     matchDlch(r.dlch, dlch)
   )||null;
-  // 주소/위치용 다중 매칭: TAC/PCI 일치 항목은 모두 수집 (NETA가 응답한 Cell 신뢰)
+  // 주소/위치용 다중 매칭: TAC/PCI + 요청 Band 범위 일치
   const rawMatchedStations=infoArr.filter(r=>
-    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)
+    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)&&isInBandRange(r.dlch,band)
   );
   // 동일 CID 중복 출력 방지 (각 Cell은 고유한 것으로 가정)
   const seenCids=new Set();
