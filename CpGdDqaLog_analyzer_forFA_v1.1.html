@@ -1739,9 +1739,9 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     String(r.pci)===String(pci)&&
     matchDlch(r.dlch, dlch)
   )||null;
-  // 주소/위치용 다중 매칭: 요청하신 밴드 조건(dlch)을 충족하는 해당 밴드의 모든 기지국 정보 수집
+  // 주소/위치용 다중 매칭: 동일 TAC/PCI에 등록된 모든 기지국 정보 수집 (Band/DLCh 무관)
   const rawMatchedStations=infoArr.filter(r=>
-    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)&&matchDlch(r.dlch, dlch)
+    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)
   );
   // 동일 CID 중복 출력 방지를 위한 중복 제거 필터링
   const seenCids=new Set();
