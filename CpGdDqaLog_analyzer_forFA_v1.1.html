@@ -1739,17 +1739,16 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     String(r.pci)===String(pci)&&
     matchDlch(r.dlch, dlch)
   )||null;
-  // 주소/위치용 다중 매칭: 요청 DLCh에 일치하는 TAC/PCI의 모든 Cell 수집
+  // 주소/위치용 다중 매칭: TAC/PCI 일치 항목은 모두 수집 (NETA가 응답한 Cell 신뢰)
   const rawMatchedStations=infoArr.filter(r=>
-    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)&&matchDlch(r.dlch, dlch)
+    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)
   );
-  // 동일 CID+DLCh 중복 출력 방지 (같은 Cell ID여도 DLCh가 다르면 별도 표시)
-  const seenCidDlch=new Set();
+  // 동일 CID 중복 출력 방지 (각 Cell은 고유한 것으로 가정)
+  const seenCids=new Set();
   const matchedStations=rawMatchedStations.filter(st=>{
     if(!st.cid) return true;
-    const key=`${st.cid}|${st.dlch||''}`;
-    if(seenCidDlch.has(key)) return false;
-    seenCidDlch.add(key);
+    if(seenCids.has(st.cid)) return false;
+    seenCids.add(st.cid);
     return true;
   });
   // 이벤트 데이터 소스: trendLatest(이미 PCI/DLCh 필터링) 우선, 그다음 strictMatch
