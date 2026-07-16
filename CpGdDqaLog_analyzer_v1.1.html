@@ -1717,7 +1717,8 @@ function prefetchTop3Neta(){
     if(!isNetaSupportedStation(s))return; // 3G/NR 스킵
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
-    const {dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
+    const bandArg = s.band && isNaN(s.band) ? '' : s.band;
+    const {dlch}=netaResolve(plmn,s.tac,s.pid,bandArg,s.dch||'');
     fetchNetaStation(plmn,s.tac,s.pid,s.band||'',s.dch||'').then(result=>{
       // 확장 행이 이미 로딩 상태로 열려있으면 결과로 교체
       const expRow=document.querySelector(`[data-neta-exp="${CSS.escape(s.key)}"]`);
@@ -1746,16 +1747,36 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   const validTrend=Array.isArray(trend)&&!trend._fetchErr?trend:null;
   const trendLatest=validTrend?.length?validTrend[validTrend.length-1]:null;
   const infoArr=Array.isArray(validInfo)?validInfo:(validInfo?[validInfo]:[]);
+
+  // 정수형 변환을 통한 안전한 DLCh 대조 함수
+  const matchDlch = (a, b) => {
+    if (!a || !b) return true;
+    const numA = parseInt(String(a).trim(), 10);
+    const numB = parseInt(String(b).trim(), 10);
+    if (isNaN(numA) || isNaN(numB)) {
+      return String(a).trim() === String(b).trim();
+    }
+    return numA === numB;
+  };
+
   // 이벤트 데이터용 엄격 매칭: TAC + PCI + DLCh (Band가 다르면 매칭 실패 → 이벤트 데이터 없음)
   const strictMatch=infoArr.find(r=>
     String(r.tac)===String(tacDec)&&
     String(r.pci)===String(pci)&&
-    (dlch?String(r.dlch??'')===String(dlch):true)
+    matchDlch(r.dlch, dlch)
   )||null;
-  // 주소/위치용 느슨 매칭: TAC + PCI (Band 무관) — 같은 셀의 주소·좌표는 Band와 독립적
-  const looseMatch=infoArr.find(r=>
-    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)
-  )||null;
+  // 주소/위치용 다중 매칭: 요청하신 밴드 조건(dlch)을 충족하는 해당 밴드의 모든 기지국 정보 수집
+  const rawMatchedStations=infoArr.filter(r=>
+    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)&&matchDlch(r.dlch, dlch)
+  );
+  // 동일 CID 중복 출력 방지를 위한 중복 제거 필터링
+  const seenCids=new Set();
+  const matchedStations=rawMatchedStations.filter(st=>{
+    if(!st.cid) return true;
+    if(seenCids.has(st.cid)) return false;
+    seenCids.add(st.cid);
+    return true;
+  });
   // 이벤트 데이터 소스: trendLatest(이미 PCI/DLCh 필터링) 우선, 그다음 strictMatch
   const eventSrc=trendLatest||strictMatch;
   // 주소/위치는 업로드된 지역정보 CSV를 1순위로 사용
@@ -1770,20 +1791,48 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   // ── 왼쪽 컬럼: 주소 + 소형 지도 (CSV 우선, NETA loose 매칭 차순위 — Band 무관)
   let leftCol='<div class="neta-left-col">';
   let hasMap=false;
-  const region=csvGeo?.addr||looseMatch?.region||'';
-  const cidVal=looseMatch?.cid||'';
-  const lat=csvGeo?.lat??looseMatch?.lat??null;
-  const lng=csvGeo?.lng??looseMatch?.lng??null;
-  if(region||lat!=null){
-    const cidHtml=cidVal?`<span style="font-size:10px;color:#64748b;display:block">CID: ${esc(cidVal)}</span>`:'';
-    const locSrc=lat!=null&&lng!=null?`<span style="font-size:10px;color:#94a3b8">${lat}, ${lng}</span>`:'';
-    const mapDiv=lat!=null&&lng!=null?`<div id="${uid}-map" class="neta-leaflet-mini"></div>`:'';
-    leftCol+=`<div class="neta-loc-section">
-      <div class="neta-label">📍 주소 / 위치</div>
-      <div class="neta-value" style="font-weight:600;font-size:15px;line-height:1.35">${esc(region||'-')}</div>
-      ${cidHtml}${locSrc}${mapDiv}
+  
+  let locHtml = '';
+  let firstLat = null, firstLng = null;
+
+  if (csvGeo) {
+    firstLat = csvGeo.lat;
+    firstLng = csvGeo.lng;
+    locHtml += `<div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #e2e8f0;">
+      <span style="font-size:10px;font-weight:700;color:var(--green);display:block">📍 로컬 CSV 위치 정보</span>
+      <div class="neta-value" style="font-weight:600;font-size:14px;line-height:1.35">${esc(csvGeo.addr || '-')}</div>
     </div>`;
-    if(lat!=null&&lng!=null){hasMap=true;setTimeout(()=>initNetaMiniMap(`${uid}-map`,lat,lng),80);}
+  }
+
+  if (matchedStations.length > 0) {
+    locHtml += `<span style="font-size:10px;font-weight:700;color:var(--blue-700);display:block;margin-bottom:4px;">📍 동일 TAC/PCI 등록 Cell ID (${matchedStations.length}개)</span>`;
+    matchedStations.forEach((st, idx) => {
+      if (firstLat === null && st.lat != null) {
+        firstLat = st.lat;
+        firstLng = st.lng;
+      }
+      locHtml += `<div style="margin-bottom:8px; line-height:1.4;">
+        <span style="font-size:10px;color:var(--text-secondary);font-weight:700;">CID ${esc(st.cid || 'Unknown')}</span>
+        <div class="neta-value" style="font-weight:600;font-size:13px;color:var(--text-primary);">${esc(st.region || '-')}</div>
+      </div>`;
+    });
+  }
+
+  if (locHtml || firstLat !== null) {
+    const locSrc = firstLat != null && firstLng != null ? `<span style="font-size:10px;color:#94a3b8;display:block;margin-top:4px;">대표 좌표: ${firstLat}, ${firstLng}</span>` : '';
+    const mapDiv = firstLat != null && firstLng != null ? `<div id="${uid}-map" class="neta-leaflet-mini" style="margin-top:8px;"></div>` : '';
+    
+    leftCol += `<div class="neta-loc-section">
+      <div class="neta-label">📍 주소 및 Cell 정보</div>
+      ${locHtml}
+      ${locSrc}
+      ${mapDiv}
+    </div>`;
+    
+    if (firstLat !== null && firstLng !== null) {
+      hasMap = true;
+      setTimeout(() => initNetaMiniMap(`${uid}-map`, firstLat, firstLng), 80);
+    }
   }
   leftCol+='</div>';
 
@@ -1990,7 +2039,8 @@ function renderStationTable(){
     expRow.setAttribute('data-neta-exp',s.key);
     const allR=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const plmn=allR.map(r=>(r.PLMN||'').replace(/[^0-9]/g,'')).find(p=>p)||'';
-    const {cacheKey,dlch}=netaResolve(plmn,s.tac,s.pid,s.band||'',s.dch||'');
+    const bandArg = s.band && isNaN(s.band) ? '' : s.band;
+    const {cacheKey,dlch}=netaResolve(plmn,s.tac,s.pid,bandArg,s.dch||'');
     const cached=netaCache[cacheKey]?.data;
     if(cached){
       expRow.innerHTML=`<td colspan="14">${buildNetaPanel(cached,plmn,s.tac,s.pid,dlch)}</td>`;
