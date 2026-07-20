@@ -1644,7 +1644,7 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
   const q=new URLSearchParams({operator,tac:tacDec,pci,dlch});
   const urlInfo=`${NETA_BASE}/api/stations?${q}`;
   const urlTrend=`${NETA_BASE}/api/stations/${tacDec}/trend?${new URLSearchParams({operator,pci,dlch})}`;
-  const doFetch=async(url,timeoutMs=20000)=>{
+  const doFetch=async(url,timeoutMs=45000)=>{
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
     try{
@@ -1659,7 +1659,7 @@ async function fetchNetaStation(plmn,tac,pci,band,dch){
       return{_fetchErr:reason,_url:url};
     }
   };
-  const safeFetch=async(url,timeoutMs=15000)=>{
+  const safeFetch=async(url,timeoutMs=25000)=>{
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
     try{const r=await fetch(url,{signal:ctrl.signal});clearTimeout(timer);return r.ok?await r.json():null;}
@@ -1783,9 +1783,13 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   // 주소/위치용: NETA 응답 레코드는 대표 CID 1개만 최상위에 노출하고,
   // 동일 TAC/PCI/DLCh에 등록된 실제 전체 Cell 목록은 all_locations 필드로 제공됨
   // (has_multiple_cells:true인 경우 all_locations에 모든 Cell이 이미 들어있음)
+  // info(stations) 응답이 비어도 trend 응답에 동일 형태(all_locations 포함) 레코드가
+  // 있으면 그것으로 위치를 채움 — 한쪽 API만 응답한 기지국에서 위치란이 비는 것 방지
   const primaryMatch=strictMatch
     ||infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))
     ||infoArr[0]
+    ||(Array.isArray(validTrend)?validTrend.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)):null)
+    ||trendLatest
     ||null;
   let matchedStations=[];
   if(primaryMatch){
