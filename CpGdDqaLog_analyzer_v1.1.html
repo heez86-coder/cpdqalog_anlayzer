@@ -394,6 +394,7 @@ let netaGlobalAuxPromise={}; // {tauRej, rept} — operator 무관, 세션 전�
 let netaFaPromise={};     // operator → promise
 let netaMemoPromise={};   // operator → promise
 let netaPciDupPromise={}; // `${operator}|${week}` → promise
+let netaPanelSeq=0; // buildNetaPanel 호출마다 증가 — 지도 컨테이너 id 충돌 방지용
 const RP=50;let charts=[];
 const SOUND_TYPES=[
   {key:'RSMT',label:'Short Mute',color:'#e74c3c',tag:'tr',desc:'짧은 음성 끊김',cat:'rx'},
@@ -1784,12 +1785,12 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   // 동일 TAC/PCI/DLCh에 등록된 실제 전체 Cell 목록은 all_locations 필드로 제공됨
   // (has_multiple_cells:true인 경우 all_locations에 모든 Cell이 이미 들어있음)
   // info(stations) 응답이 비어도 trend 응답에 동일 형태(all_locations 포함) 레코드가
-  // 있으면 그것으로 위치를 채움 — 한쪽 API만 응답한 기지국에서 위치란이 비는 것 방지
+  // 있으면 그것으로 위치를 채움 — 한쪽 API만 응답한 기지국에서 위치란이 비는 것 방지.
+  // 단, TAC+PCI가 실제로 일치하는 레코드만 사용 — infoArr[0]/trendLatest 같은 무조건
+  // 폴백은 NETA에 해당 기지국이 없을 때 엉뚱한 다른 기지국의 주소/CID를 표시하게 되므로 금지.
   const primaryMatch=strictMatch
     ||infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))
-    ||infoArr[0]
     ||(Array.isArray(validTrend)?validTrend.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)):null)
-    ||trendLatest
     ||null;
   let matchedStations=[];
   if(primaryMatch){
@@ -1820,7 +1821,9 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
   // 참고 태그 — fetchNetaStation에서 실제 참고 API로 채워진 값 사용
   const refTags=result.refTags||[];
 
-  const uid='np'+Date.now();
+  // Date.now()만 쓰면 top3 기지국을 같은 밀리초에 연속 렌더링할 때 id가 충돌해
+  // 지도가 초기화되지 않는 기지국이 생기므로 호출마다 증가하는 카운터를 덧붙임
+  const uid='np'+Date.now()+'_'+(netaPanelSeq++);
   const scoreColor=s=>s>=700?'#dc2626':s>=400?'#b45309':'#16a34a';
 
   // ── 왼쪽 컬럼: 주소 + 소형 지도 (CSV 우선, NETA loose 매칭 차순위 — Band 무관)
