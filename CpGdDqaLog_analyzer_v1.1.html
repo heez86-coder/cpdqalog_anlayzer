@@ -1765,14 +1765,29 @@ function buildNetaPanel(result,plmn,tac,pci,dlch){
     String(r.pci)===String(pci)&&
     matchDlch(r.dlch, dlch)
   )||null;
-  // 주소/위치용 다중 매칭: TAC + PCI + DLCh 정확히 일치하는 모든 Cell 수집
-  // (동일 TAC/PCI라도 DLCh가 다르면 다른 Band의 별개 기지국이므로 제외)
-  const rawMatchedStations=infoArr.filter(r=>
-    String(r.tac)===String(tacDec)&&String(r.pci)===String(pci)&&matchDlch(r.dlch, dlch)
-  );
+  // 주소/위치용: NETA 응답 레코드는 대표 CID 1개만 최상위에 노출하고,
+  // 동일 TAC/PCI/DLCh에 등록된 실제 전체 Cell 목록은 all_locations 필드로 제공됨
+  // (has_multiple_cells:true인 경우 all_locations에 모든 Cell이 이미 들어있음)
+  const primaryMatch=strictMatch
+    ||infoArr.find(r=>String(r.tac)===String(tacDec)&&String(r.pci)===String(pci))
+    ||infoArr[0]
+    ||null;
+  let matchedStations=[];
+  if(primaryMatch){
+    if(Array.isArray(primaryMatch.all_locations)&&primaryMatch.all_locations.length>0){
+      matchedStations=primaryMatch.all_locations.map(loc=>({
+        cid:loc.cid,
+        region:loc.address??loc.region,
+        lat:loc.lat,
+        lng:loc.lng
+      }));
+    }else{
+      matchedStations=[{cid:primaryMatch.cid,region:primaryMatch.region,lat:primaryMatch.lat,lng:primaryMatch.lng}];
+    }
+  }
   // 동일 CID 중복 출력 방지
   const seenCids=new Set();
-  const matchedStations=rawMatchedStations.filter(st=>{
+  matchedStations=matchedStations.filter(st=>{
     if(!st.cid) return true;
     if(seenCids.has(st.cid)) return false;
     seenCids.add(st.cid);
