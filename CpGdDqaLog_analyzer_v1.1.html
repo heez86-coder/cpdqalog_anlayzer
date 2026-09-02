@@ -730,6 +730,8 @@ function buildStationMap(){
   allRows.forEach(r=>{
     const f=r.Feature;
     if(['CEND','DROP','MUTE'].includes(f)){
+      // MUTE는 TXSF(사용자 의도 송화차단) 등에서 PCI가 0으로 찍히는 비정상 케이스가 있어 기지국별 통계에서 제외
+      if(f==='MUTE'&&(!r.PhID||parseInt(r.PhID,10)===0))return;
       const key=f==='MUTE'?getCellKey(r.TAC_,r.PhID,r.DLCh,r.LBND):getCellKey(r.TAC_,r.PhID,r.DLCh);
       if(!key)return;
       ensure(key);const s=stationMap[key];
@@ -1166,8 +1168,21 @@ function renderInsights(){
   const mipiRows2=byFeat('MIPI');
   if(mipiRows2.length>0){
     const mipiWithInfo=mipiRows2.filter(r=>{const m=String(r.MID_??'').trim(),p=String(r.PID_??'').trim();return(m&&m!=='0000')||(p&&p!=='0000');});
-    const infoTxt=mipiWithInfo.length>0?` (MID/PID 오류 ${mipiWithInfo.length}건)`:'';
-    push(mipiWithInfo.length>0?'warn':'info',`MIPI 오류 ${mipiRows2.length}건 발생${infoTxt} — 단말 하드웨어 점검 필요`,'device');
+    let infoTxt='';
+    if(mipiWithInfo.length>0){
+      const comboCnt={};
+      mipiWithInfo.forEach(r=>{
+        const m=String(r.MID_??'').trim()||'0000',p=String(r.PID_??'').trim()||'0000';
+        const k=`MID ${m} / PID ${p}`;
+        comboCnt[k]=(comboCnt[k]||0)+1;
+      });
+      const combos=Object.entries(comboCnt).sort((a,b)=>b[1]-a[1]);
+      const [topCombo,topN]=combos[0];
+      const otherTxt=combos.length>1?` 외 ${combos.length-1}건 조합`:'';
+      infoTxt=` (${topCombo}${topN>1?` ${topN}건`:''}${otherTxt})`;
+    }
+    const tailMsg=mipiWithInfo.length>0?'해당부품 확인 후 점검 필요':'단말 하드웨어 점검 필요';
+    push(mipiWithInfo.length>0?'warn':'info',`MIPI 오류 ${mipiRows2.length}건 발생${infoTxt} — ${tailMsg}`,'device');
   }
   const attiRows=byFeat('ATTI'),attfRows=byFeat('ATTF');
   const pdpiRows=byFeat('PDPI'),pdpfRows=byFeat('PDPF');
@@ -1202,24 +1217,35 @@ function renderInsights(){
     }
     return `${label} ${rows.length}건`+(dParts.length?` (${dParts.join(', ')})`:'');
   };
-  if(attfCnt>=3||attiCnt>=3){
+  // 개통 첫날(dates[0])에만 발생하고 그 이후 재발하지 않은 망등록 이벤트는 인사이트에서 제외
+  // (최초 개통 시 정상적으로 발생하는 1회성 등록 절차이며 지속적 문제가 아님)
+  const onlyFirstDay=rows=>dates.length>1&&rows.length>0&&rows.every(r=>r.Date===dates[0]);
+  const effAttfCnt=onlyFirstDay(attfRows)?0:attfCnt;
+  const effAttiCnt=onlyFirstDay(attiRows)?0:attiCnt;
+  if(effAttfCnt>=3||effAttiCnt>=3){
     const parts=[];
-    if(attfCnt>=3)parts.push(buildRegiDetail(attfRows,'ATTF','EMMC',EMMC_CAUSES));
-    if(attiCnt>=3)parts.push(buildRegiDetail(attiRows,'ATTI','EMMC',EMMC_CAUSES));
-    push(attfCnt>=5||attiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 → ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
+    if(effAttfCnt>=3)parts.push(buildRegiDetail(attfRows,'ATTF','EMMC',EMMC_CAUSES));
+    if(effAttiCnt>=3)parts.push(buildRegiDetail(attiRows,'ATTI','EMMC',EMMC_CAUSES));
+    push(effAttfCnt>=5||effAttiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 → ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
   }
-  if(pdpfCnt>=3||pdpiCnt>=3){
+  const effPdpfCnt=onlyFirstDay(pdpfRows)?0:pdpfCnt;
+  const effPdpiCnt=onlyFirstDay(pdpiRows)?0:pdpiCnt;
+  if(effPdpfCnt>=3||effPdpiCnt>=3){
     const parts=[];
-    if(pdpfCnt>=3)parts.push(buildRegiDetail(pdpfRows,'PDPF','ENDR',PDPF_ENDR));
-    if(pdpiCnt>=3)parts.push(buildRegiDetail(pdpiRows,'PDPI','ENDR',PDPI_ENDR));
-    push(pdpfCnt>=5||pdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 → ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
+    if(effPdpfCnt>=3)parts.push(buildRegiDetail(pdpfRows,'PDPF','ENDR',PDPF_ENDR));
+    if(effPdpiCnt>=3)parts.push(buildRegiDetail(pdpiRows,'PDPI','ENDR',PDPI_ENDR));
+    push(effPdpfCnt>=5||effPdpiCnt>=5?'danger':'warn',`PDP 연결 오류 다수 → ${parts.join(' / ')} — 데이터 접속 장애 확인 필요`,'device');
   }
   const mmrjRows=byFeat('MMRJ');
-  if(mmrjRows.length>=2){
+  if(mmrjRows.length>=2&&!onlyFirstDay(mmrjRows)){
     push(mmrjRows.length>=5?'danger':'warn',`MM Reject 다수 → ${buildRegiDetail(mmrjRows,'MMRJ','RJCU',MMRJ_CAUSES)} — 네트워크 거부 사유 확인 필요`,'device');
   }
-  const simdChg=byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).length;
-  if(simdChg>0)push('info',`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`,'device');
+  // 감지 일수는 행 개수가 아닌 고유 날짜 수 기준 (하루에 SIMD 레코드가 여러 건이면 중복 집계 방지)
+  const simdChgDates=new Set(byFeat('SIMD').filter(r=>r._simdDiff&&r._simdDiff.length).map(r=>r.Date));
+  const simdChg=simdChgDates.size;
+  // 데이터가 10일 이상인데 변화 감지일이 10% 이하면 노이즈로 간주하고 표시하지 않음
+  const simdNoise=dates.length>=10&&(simdChg/dates.length)<=0.1;
+  if(simdChg>0&&!simdNoise)push('info',`SIM 상태 변화 ${simdChg}일 감지 — SIM Tray/접촉 이슈 확인 필요`,'device');
 
   // ── 렌더링 ────────────────────────────────────────────
   if(!items.length){items.push({lv:'good',t:'특이사항 없음 — 전반적으로 양호한 상태입니다.',grp:''});}
@@ -1493,6 +1519,7 @@ function renderMuteTab(){
         const pid=String(r.PhID||'').trim();
         const dch=String(r.DLCh||'').trim();
         if(!tac&&!pid)return;
+        if(pid==='0')return; // TXSF 등에서 PCI 0으로 찍히는 비정상 케이스 제외
         const k=`${tac}|${pid}|${dch}`;
         if(!stCnt[k])stCnt[k]={tac,pid,dch,cnt:0};
         stCnt[k].cnt++;
