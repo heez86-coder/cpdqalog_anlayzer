@@ -726,7 +726,7 @@ function buildRlfEvents(){
 }
 function buildStationMap(){
   stationMap={};
-  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',band:'',drops:[],mutes:[],nonMicMutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],muteBler:[],rlfiRsrp:[],antDiffDrops:[]};};
+  const ensure=key=>{if(!stationMap[key])stationMap[key]={key,tac:'',pid:'',dch:'',lbnd:'',nbnd:'',band:'',drops:[],mutes:[],nonMicMutes:[],rlfis:[],cends:[],dropRsrp:[],dropSinr:[],muteRsrp:[],muteSinr:[],muteBler:[],rlfiRsrp:[],antDiffDrops:[]};};
   allRows.forEach(r=>{
     const f=r.Feature;
     if(['CEND','DROP','MUTE'].includes(f)){
@@ -747,6 +747,7 @@ function buildStationMap(){
       if(f==='MUTE'){
         s.mutes.push(r);
         if(r.LBND)s.lbnd=r.LBND;
+        if(r.NBND)s.nbnd=r.NBND;
         const isMicOnly=['SAMS','MCST','SMBU','TXSF'].some(k=>parseInt(r[k]||0,10)>0||r[k]==='1'||r[k]===1);
         const hasSoundMute=SOUND_TYPES.some(t=>r[t.key]==='1'||r[t.key]===1);
         if(hasSoundMute||!isMicOnly)s.nonMicMutes.push(r);
@@ -766,7 +767,7 @@ function buildStationMap(){
   Object.values(stationMap).forEach(s=>{
     const allRForAct=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
     const actForBand=allRForAct.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
-    const bandLbl=getBandLabel(s.dch,actForBand);
+    const bandLbl=getBandLabelEx(s.dch,actForBand,s.nbnd);
     s.band=bandLbl!=null?bandLbl:(s.dch||s.lbnd||'');
     const totalRef=s.cends.length+s.drops.length;
     s.probCount=s.drops.length+s.nonMicMutes.length+s.rlfis.length;
@@ -1541,16 +1542,17 @@ function renderMuteTab(){
         const pid=String(r.PhID||'').trim();
         const dch=String(r.DLCh||'').trim();
         const act=String(r.ACT_??r.ACT??'').trim();
+        const nbnd=String(r.NBND||'').trim();
         if(!tac&&!pid)return;
         if(pid==='0')return; // TXSF 등에서 PCI 0으로 찍히는 비정상 케이스 제외
         const k=`${tac}|${pid}|${dch}`;
-        if(!stCnt[k])stCnt[k]={tac,pid,dch,act,cnt:0};
+        if(!stCnt[k])stCnt[k]={tac,pid,dch,act,nbnd,cnt:0};
         stCnt[k].cnt++;
       });
       const topSt=Object.values(stCnt).sort((a,b)=>b.cnt-a.cnt)[0];
       let topStHtml='';
       if(topSt&&topSt.cnt>=2){
-        const bandVal=getBandLabel(topSt.dch,topSt.act);
+        const bandVal=getBandLabelEx(topSt.dch,topSt.act,topSt.nbnd);
         const bandLbl=bandVal!=null?`Band ${bandVal}`:(topSt.dch?`DLCh ${topSt.dch}`:'');
         topStHtml='<span class="day-sub" style="color:#1a6fa0">최다 기지국: TAC '+tacToDecStr(topSt.tac)+' / PCI '+topSt.pid+(bandLbl?' / '+bandLbl:'')+' ('+topSt.cnt+'건)</span>';
       }
@@ -2469,8 +2471,25 @@ function getBandLabel(dch,act){
   const b=getDchBand(dch);
   return b!=null?String(b):null;
 }
+// MUTE 등 NBND(NR Band 번호) 필드가 직접 주어지는 경우 우선 사용 — ACT=6일 때
+// LBND(LTE Band)는 0으로 찍히고 실제 NR 서빙 밴드는 NBND에 담기는 케이스 대응.
+// NBND가 없으면 DLCh(ARFCN) 기반 추정(getBandLabel)으로 폴백.
+function getBandLabelEx(dch,act,nbnd){
+  if(String(act??'').trim()==='6'){
+    const nb=String(nbnd??'').trim();
+    if(nb&&nb!=='0')return 'n'+nb;
+  }
+  return getBandLabel(dch,act);
+}
 function getRawBandDLCh(r){
-  if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?String(b):''}
+  if(r.Feature==='MUTE'){
+    // ACT=6(NR)이면 LBND(LTE Band)가 0으로 찍혀도 NBND(NR Band)가 실제 서빙 밴드
+    if(String(r.ACT_??r.ACT??'').trim()==='6'){
+      const nb=String(r.NBND??'').trim();
+      if(nb&&nb!=='0')return 'n'+nb;
+    }
+    const b=r.LBND;return b!=null&&b!==''?String(b):'';
+  }
   if(r.Feature==='SCGF'){
     const lte=r.MBnd??r.LBnd??'';const nr=r.SBnd??r.NBnd??'';
     const parts=[];if(lte)parts.push('B'+lte);if(nr)parts.push('n'+nr);
