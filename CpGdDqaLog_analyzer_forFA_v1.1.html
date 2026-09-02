@@ -744,7 +744,10 @@ function buildStationMap(){
     const rxp=fRsrp(e.RxP0);if(rxp!==null)s.rlfiRsrp.push(rxp);
   });
   Object.values(stationMap).forEach(s=>{
-    const bNum=getDchBand(s.dch);s.band=bNum!=null?String(bNum):(s.dch||s.lbnd||'');
+    const allRForAct=[...s.drops,...s.cends,...s.mutes,...s.rlfis];
+    const actForBand=allRForAct.map(r=>String(r.ACT_??r.ACT??'').trim()).find(a=>a)||'';
+    const bandLbl=getBandLabel(s.dch,actForBand);
+    s.band=bandLbl!=null?bandLbl:(s.dch||s.lbnd||'');
     const totalRef=s.cends.length+s.drops.length;
     s.probCount=s.drops.length+s.nonMicMutes.length+s.rlfis.length;
     s.dropRate=totalRef>0?(s.drops.length/totalRef*100):0;
@@ -1511,17 +1514,18 @@ function renderMuteTab(){
         const tac=String(r.TAC_||'').trim();
         const pid=String(r.PhID||'').trim();
         const dch=String(r.DLCh||'').trim();
+        const act=String(r.ACT_??r.ACT??'').trim();
         if(!tac&&!pid)return;
         if(pid==='0')return; // TXSF 등에서 PCI 0으로 찍히는 비정상 케이스 제외
         const k=`${tac}|${pid}|${dch}`;
-        if(!stCnt[k])stCnt[k]={tac,pid,dch,cnt:0};
+        if(!stCnt[k])stCnt[k]={tac,pid,dch,act,cnt:0};
         stCnt[k].cnt++;
       });
       const topSt=Object.values(stCnt).sort((a,b)=>b.cnt-a.cnt)[0];
       let topStHtml='';
       if(topSt&&topSt.cnt>=2){
-        const bandNum=getDchBand(topSt.dch);
-        const bandLbl=bandNum!=null?`Band ${bandNum}`:(topSt.dch?`DLCh ${topSt.dch}`:'');
+        const bandVal=getBandLabel(topSt.dch,topSt.act);
+        const bandLbl=bandVal!=null?`Band ${bandVal}`:(topSt.dch?`DLCh ${topSt.dch}`:'');
         topStHtml='<span class="day-sub" style="color:#1a6fa0">최다 기지국: TAC '+tacToDecStr(topSt.tac)+' / PCI '+topSt.pid+(bandLbl?' / '+bandLbl:'')+' ('+topSt.cnt+'건)</span>';
       }
       body+='<div class="day-row" style="border-left-color:'+t.color+'"><span class="day-key">['+t.key+']</span><span class="day-lbl">'+t.label+'</span><span class="day-cnt">'+n+'건</span>'+(ecnts.length>0?'<span class="day-sub">ECNT avg '+avgE+(highE>0?' &nbsp;<span class="ecnt-high">⚠ ≥5: '+highE+'건</span>':'')+'</span>':'')+topStHtml+'</div>';
@@ -2421,6 +2425,27 @@ function getDchBand(dch){
   if(d>=3450&&d<=3799)return 8; // Band 8 (900 MHz):  EARFCN 3450–3799
   return null;
 }
+// NR(5G) ARFCN → Band (3GPP TS 38.101-1 Table 5.4.2.1-1, 국내 상용 대역 위주)
+function getNrBand(arfcn){
+  const d=parseInt(arfcn);
+  if(isNaN(d)||d<=0)return null;
+  if(d>=422000&&d<=434000)return 'n1';
+  if(d>=361000&&d<=376000)return 'n3';
+  if(d>=173800&&d<=178800)return 'n5';
+  if(d>=524000&&d<=538000)return 'n7';
+  if(d>=185000&&d<=192000)return 'n8';
+  if(d>=151600&&d<=160600)return 'n28';
+  if(d>=460000&&d<=480000)return 'n40';
+  if(d>=620000&&d<=653333)return 'n78'; // 국내 3사 5G SA/NSA 공통 중대역(3.5GHz)
+  if(d>=693334&&d<=733333)return 'n79';
+  return null;
+}
+// ACT(2/4/6=3G/LTE/NR)에 따라 알맞은 Band 매핑 함수를 선택 — NR은 'n78' 형태, LTE는 숫자
+function getBandLabel(dch,act){
+  if(String(act??'').trim()==='6')return getNrBand(dch);
+  const b=getDchBand(dch);
+  return b!=null?String(b):null;
+}
 function getRawBandDLCh(r){
   if(r.Feature==='MUTE'){const b=r.LBND;return b!=null&&b!==''?String(b):''}
   if(r.Feature==='SCGF'){
@@ -2429,7 +2454,7 @@ function getRawBandDLCh(r){
     return parts.join(' - ');
   }
   const dch=r.DLCh??'';if(!dch)return'';
-  const band=getDchBand(dch);
+  const band=getBandLabel(dch,r.ACT_??r.ACT);
   return band!=null?`${band} (${dch})`:String(dch);
 }
 function getRawNote(r){
