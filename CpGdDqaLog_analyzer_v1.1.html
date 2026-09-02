@@ -1000,6 +1000,16 @@ function renderInsights(){
     const g3Pct=Math.round(g3Cnt/callRows.length*100);
     push('warn',`3G 통화이력 ${g3Cnt}건 (전체 통화 ${callRows.length}건 중 ${g3Pct}%) — 3G 통화 다수 발생 확인 필요`,'drop');
   }
+  {
+    // VoNR — MUTE/DROP 이벤트 중 ACT=NR(6) 비중이 높으면 SA 커버리지/동작이상 의심
+    const muteDropRows=[...muteRows,...dropRows];
+    const nrRows=muteDropRows.filter(r=>String(r.ACT_??r.ACT??'').trim()==='6');
+    if(muteDropRows.length>=3&&nrRows.length>=3){
+      const nrPct=Math.round(nrRows.length/muteDropRows.length*100);
+      if(nrPct>=50)
+        push('warn',`VoNR Mute/Drop 발생률 높음 (${nrRows.length}/${muteDropRows.length}건, ${nrPct}%) → SA 커버리지 및 동작이상 관련 확인필요`,'drop');
+    }
+  }
 
   {
     const sipr1115=dropRows.filter(r=>String(r.SIPR||'').trim()==='1115');
@@ -1227,6 +1237,15 @@ function renderInsights(){
     if(effAttfCnt>=3)parts.push(buildRegiDetail(attfRows,'ATTF','EMMC',EMMC_CAUSES));
     if(effAttiCnt>=3)parts.push(buildRegiDetail(attiRows,'ATTI','EMMC',EMMC_CAUSES));
     push(effAttfCnt>=5||effAttiCnt>=5?'danger':'warn',`LTE Attach 오류 다수 → ${parts.join(' / ')} — 네트워크 등록 문제 확인 필요`,'device');
+  }
+  {
+    // ATTF에서 EMMC 6(Illegal ME) 또는 8(EPS+Non-EPS 서비스 불허)이 다수면 정상 개통 여부 자체를 의심
+    const attfEmmc68=attfRows.filter(r=>{const v=String(r.EMMC??'').trim();return v==='6'||v==='8';});
+    if(attfEmmc68.length>=3){
+      const topCode=topVal(attfEmmc68.map(r=>String(r.EMMC).trim()));
+      const desc=EMMC_CAUSES[topCode];
+      push('danger',`ATTF에서 EMMC ${topCode}${desc?`(${desc})`:''} ${attfEmmc68.length}건 다수 발생 → 정상개통여부 사업자 확인필요`,'device');
+    }
   }
   const effPdpfCnt=onlyFirstDay(pdpfRows)?0:pdpfCnt;
   const effPdpiCnt=onlyFirstDay(pdpiRows)?0:pdpiCnt;
